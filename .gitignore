@@ -1,0 +1,5 @@
+*.png
+*.json
+venv/
+.env
+test.txt
