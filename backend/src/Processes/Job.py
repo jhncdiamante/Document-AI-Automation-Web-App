@@ -8,6 +8,6 @@ class Job:
     selected_feature: str
     files: list
     status: str
-    document_type: str
-    
+    created_at: str
+    completed_at: str | None = None
 

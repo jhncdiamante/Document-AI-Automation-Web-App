@@ -1,8 +1,4 @@
-from abc import ABC, abstractmethod
 
-class IFeature(ABC):
-    @abstractmethod
-    def run(self): pass
-
-    @abstractmethod
-    def create_prompt(self): pass
+class AIFeature:
+    def __init__(self, ai_model):
+        self._ai_model = ai_model

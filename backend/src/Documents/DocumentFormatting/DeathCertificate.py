@@ -1,9 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from backend.src.Documents.Document import Document
 
 @dataclass
-class DeathCertificate:
+class DeathCertificate(Document):
     name: str = "Certificate of Death"
-    fields: list[str] = [
+    fields: list[str] = field(default_factory=lambda: [
         "DECEDENT'S LEGAL NAME (FIRST, MIDDLE, LAST, SUFFIX)",
         "AKA'S (IF ANY)",
         "DATE OF DEATH",
@@ -52,4 +53,7 @@ class DeathCertificate:
         "CERTIFIER'S ADDRESS",
         "DATE REGISTERED",
         "DATE ISSUED",
-    ]
+    ])
+
+    def __str__(self):
+        return "Certificate of Death"

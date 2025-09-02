@@ -1,4 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000"); 
 import { 
   FileText, 
   Upload, 
@@ -19,6 +22,28 @@ import {
   X
 } from 'lucide-react';
 
+
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'completed': return 'text-green-600 bg-green-100';
+    case 'processing': return 'text-blue-600 bg-blue-100';
+    case 'queued': return 'text-yellow-600 bg-yellow-100';
+    case 'error': return 'text-red-600 bg-red-100';
+    default: return 'text-gray-600 bg-gray-100';
+  }
+};
+
+const getStatusIcon = (status) => {
+  switch (status) {
+    case 'completed': return <CheckCircle className="w-4 h-4" />;
+    case 'processing': return <Clock className="w-4 h-4" />;
+    case 'queued': return <Clock className="w-4 h-4" />;
+    case 'error': return <AlertCircle className="w-4 h-4" />;
+    default: return <Clock className="w-4 h-4" />;
+  }
+};
+
 const FuneralAuditDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('');
@@ -27,8 +52,8 @@ const FuneralAuditDashboard = () => {
   const [jobs, setJobs] = useState([
     {
       id: 1,
-      title: 'Death Certificate Audit - Smith Family',
-      type: 'general',
+      case_number: 'Death Certificate Audit - Smith Family',
+      feature: 'general',
       status: 'completed',
       branch: 'Downtown Branch',
       files: 2,
@@ -39,8 +64,8 @@ const FuneralAuditDashboard = () => {
     },
     {
       id: 2,
-      title: 'Registration Worksheet Comparison',
-      type: 'comparison',
+      case_number: 'Registration Worksheet Comparison',
+      feature: 'comparison',
       status: 'processing',
       branch: 'North Branch',
       files: 4,
@@ -49,15 +74,47 @@ const FuneralAuditDashboard = () => {
     },
     {
       id: 3,
-      title: 'Estate Documentation Review',
-      type: 'general',
-      status: 'pending',
+      case_number: 'Estate Documentation Review',
+      feature: 'general',
+      status: 'queued',
       branch: 'Downtown Branch',
       files: 6,
       createdAt: '2025-08-18 10:45'
     }
   ]);
 
+  useEffect(() => {
+    // Listen for backend job updates
+    socket.on("new_job", (jobData) => {
+      console.log("New job received:", jobData);
+      setJobs((prevJobs) => [...prevJobs, jobData]); // append new job
+    });
+
+    socket.on("job_update", (updatedJob) => {
+      console.log("Job updated:", updatedJob);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job.id === updatedJob.id ? { ...job, ...updatedJob } : job
+        )
+      );
+    });
+
+    socket.on("job_progress", (update) => {
+      console.log("Job progress update:", update);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job.id === update.id ? { ...job, status: update.status } : job
+        )
+      );
+    });
+
+    return () => {
+      socket.off("new_job");
+      socket.off("job_update");
+      socket.off("job_progress");
+
+    };
+  }, []);
   const fileInputRef = useRef(null);
 
   const branches = [
@@ -76,38 +133,12 @@ const FuneralAuditDashboard = () => {
     const newJob = {
       id: jobs.length + 1,
       ...jobData,
-      status: 'pending',
-      createdAt: new Date().toLocaleString('en-CA', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
+      status: 'queued',
     };
     setJobs([...jobs, newJob]);
     setShowAddJob(false);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100';
-      case 'processing': return 'text-blue-600 bg-blue-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'error': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="w-4 h-4" />;
-      case 'processing': return <Clock className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      case 'error': return <AlertCircle className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-  };
 
   if (!isLoggedIn) {
     return (
@@ -257,7 +288,7 @@ const FuneralAuditDashboard = () => {
                       <FileText className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-sm">{job.title}</h3>
+                      <h3 className="font-semibold text-gray-900 text-sm">{job.case_number}</h3>
                       <p className="text-xs text-gray-500">{job.branch}</p>
                     </div>
                   </div>
@@ -275,11 +306,11 @@ const FuneralAuditDashboard = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Files</p>
-                      <p className="font-semibold text-gray-900">{job.files}</p>
+                      <p className="font-semibold text-gray-900">{Array.isArray(job.files) ? job.files.length : 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Type</p>
-                      <p className="font-semibold text-gray-900 capitalize">{job.type}</p>
+                      <p className="font-semibold text-gray-900 capitalize">{job.feature}</p>
                     </div>
                   </div>
 
@@ -296,19 +327,19 @@ const FuneralAuditDashboard = () => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Accuracy</p>
-                        <p className="font-semibold text-green-600">{job.accuracy}%</p>
+                        <p className="font-semibold text-green-600">{job.accuracy}</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Issues</p>
-                        <p className="font-semibold text-gray-900">{job.issues}</p>
+                        <p className="font-semibold text-gray-900">{Array.isArray(job.issues) ? job.issues.length : 0}</p>
                       </div>
                     </div>
                   )}
 
                   <div className="pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-500">Created: {job.createdAt}</p>
-                    {job.completedAt && (
-                      <p className="text-xs text-gray-500">Completed: {job.completedAt}</p>
+                    <p className="text-xs text-gray-500">Created: {job.created_at}</p>
+                    {job.completed_at && (
+                      <p className="text-xs text-gray-500">Completed: {job.completed_at}</p>
                     )}
                   </div>
                 </div>
@@ -332,7 +363,7 @@ const FuneralAuditDashboard = () => {
               </button>
             </div>
 
-            <AddJobForm onSubmit={handleAddJob} branches={branches} />
+            <AddJobForm onSubmit={handleAddJob} branches={branches} setShowAddJob={setShowAddJob}/>
           </div>
         </div>
       )}
@@ -343,7 +374,7 @@ const FuneralAuditDashboard = () => {
           <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{selectedJob.title}</h3>
+                <h3 className="text-xl font-bold text-gray-900">{selectedJob.case_number}</h3>
                 <p className="text-gray-500">{selectedJob.branch}</p>
               </div>
               <button 
@@ -362,12 +393,13 @@ const FuneralAuditDashboard = () => {
   );
 };
 
-const AddJobForm = ({ onSubmit, branches }) => {
+const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
   const [formData, setFormData] = useState({
-    title: '',
-    type: 'general',
+    case_number: '',
+    feature: 'general',
     branch: '',
     description: '',
+    created_at: '',
     files: []
   });
   const [dragActive, setDragActive] = useState(false);
@@ -413,13 +445,12 @@ const AddJobForm = ({ onSubmit, branches }) => {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Case Number</label>
           <input
             type="text"
-            value={formData.title}
-            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            value={formData.case_number}
+            onChange={(e) => setFormData(prev => ({ ...prev, case_number: e.target.value }))}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="e.g., Death Certificate Audit"
             required
           />
         </div>
@@ -447,8 +478,8 @@ const AddJobForm = ({ onSubmit, branches }) => {
             <input
               type="radio"
               value="general"
-              checked={formData.type === 'general'}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+              checked={formData.feature === 'general'}
+              onChange={(e) => setFormData(prev => ({ ...prev, feature: e.target.value }))}
               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
             />
             <span className="ml-2 text-sm text-gray-700">General Audit</span>
@@ -457,8 +488,8 @@ const AddJobForm = ({ onSubmit, branches }) => {
             <input
               type="radio"
               value="comparison"
-              checked={formData.type === 'comparison'}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+              checked={formData.feature === 'comparison'}
+              onChange={(e) => setFormData(prev => ({ ...prev, feature: e.target.value }))}
               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
             />
             <span className="ml-2 text-sm text-gray-700">Document Comparison</span>
@@ -525,58 +556,70 @@ const AddJobForm = ({ onSubmit, branches }) => {
       </div>
 
       <div className="flex space-x-4 pt-4">
-        <button
-          type="submit"
-          className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
-        >
-          Start Audit Job
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowAddJob(false)}
-          className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
+  <button
+    type="button"  // change from "submit" to "button" to prevent default form submission
+    onClick={async () => {
+      //if (formData.feature == "comparison" && formData.files.length != 2) return alert("Two files only are accepted in Comparison Feature.");
+      //if (formData.files.length === 0) return alert("Please upload at least one file.");
+      if (formData.case_number.trim() == "") return alert("Case number is required.")
+      if (!(formData.feature == "comparison" || formData.feature == "general")) return alert("Feature is required.")
+
+
+      const data = new FormData();
+      data.append("case_number", formData.case_number);
+      data.append("feature", formData.feature);
+      data.append("branch", formData.branch);
+      data.append("description", formData.description);
+      data.append("created_at", new Date().toLocaleString('en-CA', { 
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true  
+      }).replace(',', '')) 
+      formData.files.forEach(file => data.append("files", file));
+
+      try {
+        const response = await fetch("http://localhost:5000/start_audit", {
+          method: "POST",
+          body: data,
+        });
+
+        const result = await response.json();
+        setShowAddJob(false);
+        
+      } catch (err) {
+        console.error("Failed to start audit job:", err);
+      }
+    }}
+    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+  >
+    Start Audit Job
+  </button>
+
+  <button
+    type="submit"
+    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+  >
+    Cancel
+  </button>
+</div>
+
     </form>
   );
 };
 
 const JobDetails = ({ job }) => {
-  const mockAuditResults = {
+  const results = job.results || {
     summary: {
-      totalDocuments: job.files,
-      processedDocuments: job.files,
-      accuracy: job.accuracy || 95.2,
-      issues: job.issues || 2,
-      warnings: 1
+      totalDocuments: job.files?.length || 0,
+      processedDocuments: job.files?.length || 0,
+      accuracy: job.accuracy || 0,
+      issues: [],
     },
     documents: [
-      {
-        name: 'death_certificate_001.pdf',
-        status: 'completed',
-        accuracy: 98.5,
-        issues: ['Minor OCR uncertainty in date field'],
-        extractedData: {
-          'Full Name': 'John Michael Smith',
-          'Date of Death': '2025-08-15',
-          'Place of Death': 'General Hospital',
-          'Cause of Death': 'Natural causes'
-        }
-      },
-      {
-        name: 'registration_worksheet.pdf',
-        status: 'completed',
-        accuracy: 92.1,
-        issues: ['Signature verification failed', 'Address field partially illegible'],
-        extractedData: {
-          'Deceased Name': 'John Michael Smith',
-          'Registration Date': '2025-08-16',
-          'Next of Kin': 'Mary Smith'
-        }
-      }
-    ]
+]
   };
 
   return (
@@ -612,68 +655,37 @@ const JobDetails = ({ job }) => {
           {/* Summary Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900">{mockAuditResults.summary.totalDocuments}</div>
+              <div className="text-2xl font-bold text-gray-900">{results.summary.totalDocuments}</div>
               <div className="text-sm text-gray-500">Total Documents</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{mockAuditResults.summary.accuracy}%</div>
+              <div className="text-2xl font-bold text-green-600">{results.summary.accuracy}</div>
               <div className="text-sm text-gray-500">Accuracy</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">{mockAuditResults.summary.issues}</div>
+              <div className="text-2xl font-bold text-red-600">{results.summary.issues.length}</div>
               <div className="text-sm text-gray-500">Issues Found</div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{mockAuditResults.summary.warnings}</div>
-              <div className="text-sm text-gray-500">Warnings</div>
-            </div>
           </div>
 
-          {/* Document Results */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-gray-900">Document Analysis Results</h4>
-            {mockAuditResults.documents.map((doc, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-6 h-6 text-blue-500" />
-                    <div>
-                      <h5 className="font-medium text-gray-900">{doc.name}</h5>
-                      <p className="text-sm text-gray-500">Accuracy: {doc.accuracy}%</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-600 rounded-full text-sm font-medium">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Completed</span>
-                  </div>
-                </div>
-
-                {doc.issues.length > 0 && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <h6 className="font-medium text-yellow-800 mb-2">Issues Detected:</h6>
-                    <ul className="text-sm text-yellow-700 space-y-1">
-                      {doc.issues.map((issue, i) => (
-                        <li key={i}>• {issue}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h6 className="font-medium text-gray-900 mb-3">Extracted Data:</h6>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(doc.extractedData).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-sm text-gray-600">{key}:</span>
-                        <span className="text-sm font-medium text-gray-900">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* Issues List */}
+          {results.issues?.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-gray-900">Issues Detected</h4>
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <ul className="text-sm text-yellow-700 space-y-2">
+                  {results.issues.map((issue, i) => (
+                    <li key={i} className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span>{issue}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ))}
-          </div>
-        </>
+            </div>
+          )}
+
+                    </>
       )}
 
       {job.status === 'processing' && (
@@ -702,15 +714,15 @@ const JobDetails = ({ job }) => {
             
             <div className="text-sm text-blue-700">
               <p>• OCR text extraction: Complete</p>
-              <p>• AI document validation: {job.progress > 50 ? 'In progress' : 'Pending'}</p>
-              <p>• Data verification: {job.progress > 80 ? 'In progress' : 'Pending'}</p>
-              <p>• Report generation: {job.progress > 95 ? 'In progress' : 'Pending'}</p>
+              <p>• AI document validation: {job.progress > 50 ? 'In progress' : 'Queued'}</p>
+              <p>• Data verification: {job.progress > 80 ? 'In progress' : 'Queued'}</p>
+              <p>• Report generation: {job.progress > 95 ? 'In progress' : 'Queued'}</p>
             </div>
           </div>
         </div>
       )}
 
-      {job.status === 'pending' && (
+      {job.status === 'queued' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
@@ -722,11 +734,6 @@ const JobDetails = ({ job }) => {
             </div>
           </div>
           
-          <div className="text-sm text-yellow-700 space-y-1">
-            <p>• Position in queue: #2</p>
-            <p>• Estimated start time: 2-3 minutes</p>
-            <p>• Files uploaded: {job.files} documents</p>
-          </div>
         </div>
       )}
 
@@ -736,11 +743,11 @@ const JobDetails = ({ job }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-gray-500">Created:</span>
-            <span className="ml-2 font-medium text-gray-900">{job.createdAt}</span>
+            <span className="ml-2 font-medium text-gray-900">{job.created_at}</span>
           </div>
           <div>
-            <span className="text-gray-500">Type:</span>
-            <span className="ml-2 font-medium text-gray-900 capitalize">{job.type}</span>
+            <span className="text-gray-500">Feature:</span>
+            <span className="ml-2 font-medium text-gray-900 capitalize">{job.feature}</span>
           </div>
           <div>
             <span className="text-gray-500">Branch:</span>
@@ -748,12 +755,12 @@ const JobDetails = ({ job }) => {
           </div>
           <div>
             <span className="text-gray-500">Files:</span>
-            <span className="ml-2 font-medium text-gray-900">{job.files} documents</span>
+            <span className="ml-2 font-medium text-gray-900">{Array.isArray(job.files) ? job.files.length : 0}</span>
           </div>
-          {job.completedAt && (
+          {job.completed_at && (
             <div>
               <span className="text-gray-500">Completed:</span>
-              <span className="ml-2 font-medium text-gray-900">{job.completedAt}</span>
+              <span className="ml-2 font-medium text-gray-900">{job.completed_at}</span>
             </div>
           )}
         </div>

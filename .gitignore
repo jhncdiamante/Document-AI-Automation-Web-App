@@ -3,3 +3,12 @@
 venv/
 .env
 test.txt
+llm_raw_response.txt
+# Ignore SQLite and other DB files
+*.db
+
+# Ignore Python cache folders
+__pycache__/
+*.py[cod]
+uploads/
+userdata/

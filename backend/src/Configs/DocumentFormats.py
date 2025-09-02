@@ -11,9 +11,9 @@ DOCUMENT_FORMATTING_PROMPT = (
     "2. Some fields are checkboxes. OCR may mark selected boxes with an 'X' or leave them unclear.\n"
     "   - If you can determine the selected option, return it as the value.\n"
     "   - If the selection is ambiguous, return the value as null.\n"
-    "3. Always output a valid JSON object with clear key-value pairs.\n"
+    "3. Always output a valid JSON-ready text with clear key-value pairs.\n"
     "4. Check the spelling errors due to OCR text recognition inaccuracy and if reasonable, make it correct."
-    "4. The document fields format is provided below. Set the key as the fields as provided.\n"
+    "4. The document fields format is provided below. Set the key as the fields provided.\n"
     "\n"
-    "Output format: JSON only, no explanations."
+    "Output *only* valid JSON-ready TEXT. Do not include explanations, code fences (triple quotes, code block), or extra text."
 )

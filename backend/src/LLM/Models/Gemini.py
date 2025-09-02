@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from backend.src.LLM.Models.IModel import IModel
+import json
 
 
 class GeminiAI(IModel):
@@ -38,6 +39,17 @@ class GeminiAI(IModel):
                 contents=self.prompt,
                 config=self.config
             )
+            if not response.text or not response.text.strip():
+                raise RuntimeError("Gemini returned an empty response.")
+            
+            with open("llm_raw_response.txt", "w", encoding="utf-8") as f:
+                f.write(response.text if response.text else "[EMPTY RESPONSE]")
             return response.text  
         except Exception as e:
             raise RuntimeError(f"Gemini API call failed: {e}")
+        
+    def get_json_response(self) -> object:
+        return json.loads(self.get_text_response())
+
+        
+

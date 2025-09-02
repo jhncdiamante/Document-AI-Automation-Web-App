@@ -1,9 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from backend.src.Documents.Document import Document
 
 @dataclass
-class DeathRegistrationWorksheet:
-    document_name = "Death Registration Worksheet"
-    fields = [
+class DeathRegistrationWorksheet(Document):
+    name = "Death Registration Worksheet"
+    fields: list[str] = field(default_factory=lambda: [
         "1A: DECEDENT'S LEGAL FIRST NAME",
         "1B: DECEDENT'S LEGAL MIDDLE NAME",
         "1C: DECEDENT'S LEGAL LAST NAME",
@@ -48,4 +49,7 @@ class DeathRegistrationWorksheet:
         "18B: INFORMANT'S MIDDLE NAME",
         "18C: INFORMANT'S LAST NAME",
         "18D: SUFFIX (INFORMANT)",
-    ]
+    ])
+
+    def ___str__(self):
+        return "Death Registration Worksheet"
