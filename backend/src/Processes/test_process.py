@@ -19,8 +19,8 @@ def test_process_job(job_id, job_data):
         "id": job_id,
         "status": "completed",
         "accuracy": "90%",
-        "issues": ["Social Security Number fields don't match.", "Educational Background not detected."],
-        "completed_at": str(datetime.now().strftime('%Y-%m-%d %H:%M %z'))
+        "issues": [],
+        "completed_at": str(datetime.now().strftime("%Y-%m-%d %I:%M %p %z"))
     }
     print(result)
     redis_conn.publish("job_updates", json.dumps(result))
