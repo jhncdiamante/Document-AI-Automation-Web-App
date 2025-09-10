@@ -1,4 +1,5 @@
 *.png
+
 *.json
 venv/
 .env
@@ -12,3 +13,7 @@ __pycache__/
 *.py[cod]
 uploads/
 userdata/
+dump.rdb
+test.py
+wo.py
+x.py

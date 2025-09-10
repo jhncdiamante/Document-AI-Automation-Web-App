@@ -1,16 +1,22 @@
-from paddleocr import PaddleOCR
+# test_job.py - run this as a separate script
+from backend.src.Data.Redis import redis_conn
+from rq import Queue
+from x import simple_process_job
 
-img = r"D:\Web App Data Audit\Frontend\output\1756212551_9310_preprocessed_img.png"
+# Test with direct function
+queue = Queue(connection=redis_conn)
+from backend.src.Process.Job import Job
 
-ocr = PaddleOCR(
-    use_doc_orientation_classify=True,      # deskew/rotate whole page if needed
-    use_doc_unwarping=False,                # enable if you scan curved docs
-    use_textline_orientation=True,          # rotate individual lines
-    text_detection_model_name="PP-OCRv5_server_det",
-    text_recognition_model_name="PP-OCRv5_server_rec"  # accurate, multi-lang
-)
-result = ocr.predict(img)
-for res in result:
-    res.print()                  # inspect
-    res.save_to_img("output")    # visualize boxes + texts
-    res.save_to_json("output")   # structured output
+job_ref = Job(
+            funeral_branch="1",
+            case_number="123",
+            job_id="2131231",
+            selected_feature="General",
+            files=[],
+            status="queued",
+            created_at="sadad",
+
+        )
+job = queue.enqueue(simple_process_job, job_ref)
+print(f"Enqueued job: {job.id}")
+print(f"Job func_name: {job.func_name}")

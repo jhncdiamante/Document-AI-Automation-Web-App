@@ -2,16 +2,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-from backend.src.Processes.JobManager import JobManager
+from backend.src.Process.JobManager import Jobs
+from backend.src.Process.Worker import Worker
+
 from flask_socketio import SocketIO, emit
-from werkzeug.utils import secure_filename
-import uuid
-from backend.src.Data.SQLDatabase import SQLDatabase
-from backend.src.Data.Redis import redis_conn
 import threading, json
+
+
 UPLOAD_FOLDER = 'userdata/uploads' 
-
-
 
 app = Flask(__name__)
 
@@ -20,76 +18,43 @@ CORS(app, origins=["http://localhost:5173"])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
+worker = Worker(socketio=socketio)
 
-job_manager = JobManager()
-database = SQLDatabase("test.db")
-
-
+jobs = Jobs(app, worker)
 
 
-@app.route("/start_audit", methods=["POST"])
-def start_audit():
-    files_to_upload = request.files.getlist("files")
 
-    permanent_filepaths = []
-    permanent_filenames = []
 
-    for file in files_to_upload:
-        original_filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+@app.route("/user/add_job", methods=["POST"])
+def add_job():
+    job = jobs.add(request)
 
-        permanent_filenames.append(unique_filename)
-        
-        permanent_filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        
-        # Save the file to your permanent 'uploads' directory
-        file.save(permanent_filepath) 
-        
-        permanent_filepaths.append(permanent_filepath)
+    socketio.emit("new_job", 
+        {
+            "status": job.status,
+            "case_number": job.case_number,
+            "branch": job.funeral_branch,
+            "feature": job.selected_feature,
+            "description": "",
+            "created_at": job.created_at,
+            "files": job.files,
+            "id": job.job_id,
+        })
 
-    user_uploaded_data = {
-        "status": "queued",
-        "case_number": request.form.get("case_number"),
-        "branch": request.form.get("branch"),
-        "feature": request.form.get("feature"),
-        "description": request.form.get("description"),
-        "created_at": request.form.get("created_at"),
-        "files": [file.filename for file in files_to_upload],
-    }
+    return jsonify({"result":"Success"})
 
-    job_id = job_manager.create_job(user_uploaded_data)
 
-    user_uploaded_data["id"] = job_id
 
-    job_manager.push_job(job_id)
+@app.route("/user/jobs/<job_id>/stop", methods=["POST"])
+def stop_job(job_id):
+   return jobs.stop(job_id)
 
-    socketio.emit("new_job", user_uploaded_data)
+@app.route("/user/jobs/<job_id>/delete", methods=["DELETE"])
+def delete_job(job_id):
+    return jobs.delete(job_id)
 
-    #database.save_job(user_uploaded_data, "1")
-    #database.save_file_paths(permanent_filenames, permanent_filepaths, job_id, "1")
-
-    return jsonify(user_uploaded_data)
-
-def redis_listener():
-    pubsub = redis_conn.pubsub()
-    pubsub.subscribe("job_updates", "job_in_progress")
-
-    for message in pubsub.listen():
-        if message["type"] == "message":
-            try:
-                data = json.loads(message["data"].decode("utf-8"))
-            except Exception:
-                data = {"raw": message["data"].decode("utf-8")}
-
-            channel = message["channel"].decode("utf-8")
-            
-            if channel == "job_updates":
-                socketio.emit("job_update", data)
-            elif channel == "job_in_progress":
-                socketio.emit("job_progress", data)
 
 
 if __name__ == "__main__":
-    threading.Thread(target=redis_listener, daemon=True).start()
 
-    socketio.run(app, debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000, use_reloader=False)

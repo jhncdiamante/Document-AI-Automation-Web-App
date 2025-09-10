@@ -5,6 +5,27 @@ from google.genai import types
 from backend.src.LLM.Models.IModel import IModel
 import json
 
+import re, json
+def safe_json_parse(text: str):
+    # Strip triple quotes and markdown fences
+    cleaned = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
+
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        # Fallback: try to extract first {...} block
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            try:
+                block = match.group()
+                block = re.sub(r'(\d+)\s*%', r'"\1%"', block)
+                return json.loads(block)
+            except:
+                pass
+        raise RuntimeError(f"Gemini returned non-JSON text: {text}") from e
+
+
 
 class GeminiAI(IModel):
     def __init__(self, model_name: str = "gemini-1.5-flash"):
@@ -17,7 +38,6 @@ class GeminiAI(IModel):
         self.model_name = model_name
         self.prompt = None
         self.config = None
-        
 
     def set_prompt(self, prompt: str, temperature: float = 0.5, thinking_budget: int = 512):
         self.prompt = prompt
@@ -41,15 +61,17 @@ class GeminiAI(IModel):
             )
             if not response.text or not response.text.strip():
                 raise RuntimeError("Gemini returned an empty response.")
-            
-            with open("llm_raw_response.txt", "w", encoding="utf-8") as f:
-                f.write(response.text if response.text else "[EMPTY RESPONSE]")
-            return response.text  
+
+            print("Gemini raw text:", repr(response.text[:300]))
+            return response.text
         except Exception as e:
             raise RuntimeError(f"Gemini API call failed: {e}")
-        
-    def get_json_response(self) -> object:
-        return json.loads(self.get_text_response())
 
-        
+    def get_json_response(self) -> dict:
+        raw_text = self.get_text_response()
+        try:
+            return safe_json_parse(raw_text)
 
+        except json.JSONDecodeError:
+            print("Gemini returned non-JSON text, wrapping into fallback:")
+            return {"raw_text": raw_text}
