@@ -1,8 +1,8 @@
 from pdf2image import convert_from_path
 import numpy as np
-import json
 from datetime import datetime
 
+from backend.src.Models import Job as JobModel, AuditResult, Upload, db
 from backend.src.Documents.Page import Page
 from backend.src.OCR.PaddleTextRecognition import PaddleOCRTextRecognition
 from backend.src.Features.Classification import DocumentClassification
@@ -15,14 +15,14 @@ from backend.src.Features.General import GeneralAudit
 
 
 class Worker:
-    def __init__(self, ai_model=None, socketio=None, poppler_path=r"D:\libraries_and_such\poppler\poppler-25.07.0\Library\bin"):
+    def __init__(self, ai_model=None, socketio=None, poppler_path=r"D:\\libraries_and_such\\poppler\\poppler-25.07.0\\Library\\bin"):
         self.ai = ai_model or ChatGPTAI()
         self.formatter = DocumentFormatter(self.ai)
         self.comparer = DocumentComparison(self.ai)
         self.classifier = DocumentClassification(self.ai)
         self.general_audit = GeneralAudit(self.ai)
         self.ocr = PaddleOCRTextRecognition()
-        self.socketio = socketio  
+        self.socketio = socketio
         self.poppler_path = poppler_path
 
     def _convert_pdf_pages_to_images(self, pdf_path):
@@ -38,7 +38,7 @@ class Worker:
             pages = self._convert_pdf_pages_to_images(file)
             pages_read = []
 
-            for page in pages[:1]:
+            for page in pages[:1]:  # only first page for now
                 image_np = np.array(page)
                 recognized_texts = self.ocr.get_recognized_texts(image_np)
                 pages_read.append(Page(content=recognized_texts))
@@ -56,41 +56,81 @@ class Worker:
             documents.append(document)
         return documents
 
-    def process_job(self, job):
-        print("Processing job....")
-        self.socketio.start_background_task(
-            self.socketio.emit,
-            "job_in_progress",
-            {"id": job.job_id, "status": "processing"}
-        )
+    def process_job(self, job_record: JobModel):
+        """
+        Takes a JobModel record directly from DB.
+        Fetches related uploads for processing.
+        """
+        # tell frontend job started
+        self._emit_to_frontend("job_progress", {
+            "id": job_record.id,
+            "status": "processing",
+            "user_id": job_record.user_id,
+        })
 
-        feature = job.selected_feature
-        print(feature)
-        uploaded_files = job.files
+        try:
+            uploaded_files = [u.file_path for u in job_record.uploads]
+            documents = self._standardize_document(uploaded_files)
 
-        documents = self._standardize_document(uploaded_files)
+            # run feature logic
+            if job_record.feature.lower() == "general":
+                feature_results = self.general_audit.audit(documents[0])
+            elif job_record.feature.lower() == "comparison":
+                feature_results = self.comparer.compare(
+                    document1=documents[0], document2=documents[1]
+                )
+            else:
+                raise ValueError(f"Unknown feature: {job_record.feature}")
 
-        if feature.lower() == "general":
-            feature_results = self.general_audit.audit(documents[0])
-        elif feature.lower() == "comparison":
-            feature_results = self.comparer.compare(
-                document1=documents[0], document2=documents[1]
+            # job canceled mid-way?
+            if job_record.status == "canceled":
+                return
+
+            job_record.status = "completed"
+
+            audit = AuditResult(
+                job_id=job_record.id,
+                accuracy=feature_results.get("accuracy"),
+                issues=feature_results.get("issues"),
             )
-        else:
-            raise ValueError(f"Unknown feature: {feature}")
+            db.session.add(audit)
+            db.session.commit()
 
-        result = {
-            "id": job.job_id,
-            "status": "completed",
-            "accuracy": feature_results.get("accuracy"),
-            "issues": feature_results.get("issues"),
-            "completed_at": datetime.now().isoformat()
-        }
+            result = {
+                "user_id": job_record.user_id,
+                "id": job_record.id,
+                "status": "completed",
+                "accuracy": audit.accuracy,
+                "issues": audit.issues,
+                "completed_at": audit.completed_at.isoformat()
+            }
 
+        except Exception as e:
+            db.session.rollback()
+            job_record.status = "failed"
+            job_record.error = str(e)
+            db.session.commit()
+
+            result = {
+                "user_id": job_record.user_id,
+                "id": job_record.id,
+                "status": job_record.status,
+                "error": job_record.error,
+                "completed_at": job_record.completed_at.isoformat()
+            }
+            self._emit_to_frontend("job_failed", result)
+            return result
+
+        self._emit_to_frontend("job_update", result)
+        return result
+
+    def _emit_to_frontend(self, name: str, data: dict, namespace="/"):
+        """Send socketio events only to the owning user"""
+        room = f"user_{data.get('user_id')}"
         self.socketio.start_background_task(
             self.socketio.emit,
-            "job_update",
-            result
+            name,
+            data,
+            namespace=namespace,
+            room=room
         )
-
-        return result

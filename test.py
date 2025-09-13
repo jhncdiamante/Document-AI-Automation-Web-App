@@ -1,22 +1,18 @@
-# test_job.py - run this as a separate script
-from backend.src.Data.Redis import redis_conn
-from rq import Queue
-from x import simple_process_job
+from backend.src.Models import User, db
+from Application import app  # make sure you import your Flask app
+from flask_bcrypt import Bcrypt
 
-# Test with direct function
-queue = Queue(connection=redis_conn)
-from backend.src.Process.Job import Job
+bcrypt = Bcrypt(app)
 
-job_ref = Job(
-            funeral_branch="1",
-            case_number="123",
-            job_id="2131231",
-            selected_feature="General",
-            files=[],
-            status="queued",
-            created_at="sadad",
+with app.app_context():
+    if not User.query.filter_by(username="admin1").first():
+        hashed = bcrypt.generate_password_hash("password").decode("utf-8")
+        u = User(username="admin1", password=hashed)
+        db.session.add(u)
+        db.session.commit()
+        print("Created admin user:", u.username)
+    else:
+        print("Admin user already exists")
 
-        )
-job = queue.enqueue(simple_process_job, job_ref)
-print(f"Enqueued job: {job.id}")
-print(f"Job func_name: {job.func_name}")
+    # Verify
+    print("All users:", User.query.all())

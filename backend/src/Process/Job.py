@@ -5,7 +5,7 @@ class Job:
     funeral_branch: str
     case_number: str
     job_id: str
-    selected_feature: str
+    feature: str
     files: list
     status: str
     created_at: str

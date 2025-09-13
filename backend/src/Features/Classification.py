@@ -1,5 +1,5 @@
 from backend.src.Documents.Page import Page
-from backend.src.LLM.Configs.ClassificationPrompt import DOCUMENT_CLASSIFICATION_PROMPT
+from backend.src.Configs import DOCUMENT_CLASSIFICATION_PROMPT
 from backend.src.Documents.Document import get_full_document_text
 from backend.src.Features.IFeature import AIFeature
 

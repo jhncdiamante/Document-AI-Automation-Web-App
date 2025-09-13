@@ -7,7 +7,11 @@ import { Fragment } from "react";
 
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5000");
+const socket = io("http://localhost:5000", {
+  withCredentials: true,
+  transports: ["websocket"], // optional but helps avoid polling issues
+});
+
 import {
   FileText,
   Upload,
@@ -36,7 +40,7 @@ const getStatusColor = (status) => {
       return "text-blue-600 bg-blue-100";
     case "queued":
       return "text-yellow-600 bg-yellow-100";
-    case "error":
+    case "failed":
       return "text-red-600 bg-red-100";
     default:
       return "text-gray-600 bg-gray-100";
@@ -51,7 +55,7 @@ const getStatusIcon = (status) => {
       return <Clock className="w-4 h-4" />;
     case "queued":
       return <Clock className="w-4 h-4" />;
-    case "error":
+    case "failed":
       return <AlertCircle className="w-4 h-4" />;
     default:
       return <Clock className="w-4 h-4" />;
@@ -70,6 +74,33 @@ const FuneralAuditDashboard = () => {
 
 
   const [confirmAction, setConfirmAction] = useState(null);
+  useEffect(() => {
+    async function fetchJobs() {
+      try {
+        const res = await fetch("http://localhost:5000/user/jobs", {
+          method: "GET",
+          credentials: "include",   // 🔑 send cookies/session to Flask
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+  
+        if (!res.ok) {
+          // handle unauthorized / server errors gracefully
+          console.error("Server returned:", res.status);
+          return;
+        }
+  
+        const data = await res.json();
+        setJobs(data);
+      } catch (err) {
+        console.error("Failed to fetch jobs:", err);
+      }
+    }
+    fetchJobs();
+  }, []);
+  
+  
 
   const handleAction = (type, job) => {
     setConfirmAction({ type, job }); // open confirmation modal
@@ -82,11 +113,13 @@ const FuneralAuditDashboard = () => {
       if (confirmAction.type === "delete") {
         await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/delete`, {
           method: "DELETE",
+          credentials: 'include',
         });
         setJobs((prev) => prev.filter((j) => j.id !== confirmAction.job.id));
       } else if (confirmAction.type === "stop") {
         await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/stop`, {
           method: "POST",
+          credentials: 'include',
         });
         setJobs((prev) =>
           prev.map((j) =>
@@ -127,12 +160,52 @@ const FuneralAuditDashboard = () => {
       );
     });
 
+    socket.on("job_failed", (failedJob) => {
+      console.error("Job failed:", failedJob);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job.id === failedJob.id
+            ? { ...job, status: "failed", error: failedJob.error || "Unknown error" }
+            : job
+        )
+      );
+    });
+
     return () => {
       socket.off("new_job");
       socket.off("job_update");
       socket.off("job_progress");
+      socket.off("job_failed");
+
     };
   }, []);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/me", {
+          method: "GET",
+          credentials: "include",
+        });
+  
+        if (res.ok) {
+          const data = await res.json();
+          setIsLoggedIn(true);
+          console.log("Session restored for:", data.username);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setLoading(false); // <-- finished loading
+      }
+    };
+  
+    checkSession();
+  }, []);
+  
   const fileInputRef = useRef(null);
 
   const branches = [
@@ -140,10 +213,59 @@ const FuneralAuditDashboard = () => {
     "Peoria",
   ];
 
-  const handleLogin = (e) => {
-    if (e) e.preventDefault();
-    setIsLoggedIn(true);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    // Get values from the form
+    const formData = new FormData(e.target);
+    const username = formData.get("username");
+    const password = formData.get("password");
+
+    // Prepare form-encoded data for Flask
+    const data = new URLSearchParams();
+    data.append("username", username);
+    data.append("password", password);
+    
+    try {
+      const response = await fetch("http://localhost:5000/login", {
+        method: "POST",
+        body: data, // backend expects form data
+        credentials: "include", // very important for session cookie
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+  
+      if (response.ok) {
+        setIsLoggedIn(true);
+      } else {
+        const msg = await response.text();
+        alert(`Login failed: ${msg}`);
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Something went wrong, try again.");
+    }
   };
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/logout", {
+        method: "POST",
+        credentials: "include", // include cookie so Flask knows which session
+      });
+  
+      if (res.ok) {
+        setIsLoggedIn(false);  // reset local state
+        console.log("Logged out successfully");
+      } else {
+        console.error("Logout failed");
+      }
+    } catch (err) {
+      console.error("Error logging out:", err);
+    }
+  };
+  
+  
 
   const handleAddJob = (jobData) => {
     const newJob = {
@@ -154,7 +276,7 @@ const FuneralAuditDashboard = () => {
     setJobs([...jobs, newJob]);
     setShowAddJob(false);
   };
-
+  if (loading) return null; 
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -175,7 +297,8 @@ const FuneralAuditDashboard = () => {
                 Email
               </label>
               <input
-                type="email"
+                type="text"
+                name="username"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="admin@funeralservice.com"
                 required
@@ -188,6 +311,7 @@ const FuneralAuditDashboard = () => {
               </label>
               <input
                 type="password"
+                name="password"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
                 required
@@ -196,7 +320,6 @@ const FuneralAuditDashboard = () => {
 
             <button
               type="submit"
-              onClick={handleLogin}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-[1.02]"
             >
               Sign In
@@ -242,10 +365,16 @@ const FuneralAuditDashboard = () => {
                 <User className="w-4 h-4 text-white" />
               </div>
               <button
-                onClick={() => setIsLoggedIn(false)}
+                onClick={() => {
+                  handleLogout();
+                  setIsLoggedIn(false);
+                }}
+              
                 className="p-2 text-gray-400 hover:text-red-600 transition-colors"
               >
-                <LogOut className="w-5 h-5" />
+               <LogOut
+              className="w-5 h-5 cursor-pointer hover:text-red-500"
+            />
               </button>
             </div>
           </div>
@@ -328,6 +457,7 @@ const FuneralAuditDashboard = () => {
     leaveTo="transform opacity-0 scale-95"
   >
     <Menu.Items className="absolute right-0 mt-2 w-32 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
+   
       {job.status === "completed" || job.status === "stopped" ? (
         <Menu.Item>
           {({ active }) => (
@@ -399,7 +529,18 @@ const FuneralAuditDashboard = () => {
                 <div className="grid grid-cols-2 gap-4 text-sm mt-3">
                   <div>
                     <p className="text-gray-500">Accuracy</p>
-                    <p className="font-semibold text-green-600">{job.accuracy}</p>
+                    <p
+                      className={`font-semibold ${
+                        parseInt(job.accuracy) >= 80
+                          ? "text-green-600"
+                          : parseInt(job.accuracy) >= 50
+                          ? "text-yellow-500"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {job.accuracy}
+                    </p>
+
                   </div>
                   <div>
                     <p className="text-gray-500">Issues</p>
@@ -415,6 +556,13 @@ const FuneralAuditDashboard = () => {
                   </div>
                 </div>
               )}
+
+                {job.status === "failed" && (
+                  <div className="mt-3 text-sm text-red-600">
+                    <p className="font-semibold">Audit Failed</p>
+                    <p>{job.error || "An unexpected error occurred during audit."}</p>
+                  </div>
+                )}
             </div>
 
             {/* 🔹 Stick to bottom */}
@@ -428,9 +576,23 @@ const FuneralAuditDashboard = () => {
               </div>
             )}
             <div className="pt-2 border-t border-gray-100 mt-auto">
-              <p className="text-xs text-gray-500">Created: {job.created_at}</p>
+              <p className="text-xs text-gray-500">Created: {new Date(job.created_at).toLocaleString(undefined, {
+              month: "2-digit",
+              day: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true
+            })}</p>
               {job.completed_at && (
-                <p className="text-xs text-gray-500">Completed: {job.completed_at}</p>
+                <p className="text-xs text-gray-500">Completed: {new Date(job.completed_at).toLocaleString(undefined, {
+                  month: "2-digit",
+                  day: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true
+                })}</p>
               )}
             </div>
           </div>
@@ -815,21 +977,7 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
             data.append("feature", formData.feature);
             data.append("branch", formData.branch);
             data.append("description", formData.description);
-            data.append(
-              "created_at",
-              new Date()
-                .toLocaleString("en-CA", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                })
-                .replace(",", "")
-                .replace(/\./g, "")   // remove dots in a.m. / p.m.
-                .toUpperCase()
-            );
+            
             formData.files.forEach((file) => data.append("files", file));
             setShowAddJob(false);
             
@@ -838,6 +986,7 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
                 "http://localhost:5000/user/add_job",
                 {
                   method: "POST",
+                  credentials: 'include',
                   body: data,
                 }
               );
@@ -895,12 +1044,19 @@ const JobDetails = ({ job }) => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-white border border-gray-200 rounded-xl p-7 text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {job.files.length}
+              {Array.isArray(job.files) ? job.files.length : 0}
+                
               </div>
               <div className="text-sm text-gray-500">Total Documents</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-7 text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className={`text-2xl font-semibold ${
+                        parseInt(job.accuracy) >= 80
+                          ? "text-green-600"
+                          : parseInt(job.accuracy) >= 50
+                          ? "text-yellow-500"
+                          : "text-red-600"
+                      }`}>
                 {job.accuracy}
               </div>
               <div className="text-sm text-gray-500">Accuracy</div>
@@ -934,6 +1090,15 @@ const JobDetails = ({ job }) => {
         </>
       )}
 
+        {job.status === "failed" && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+            <h4 className="text-lg font-semibold text-red-700">Audit Failed</h4>
+            <p className="text-sm text-red-600 mt-2">
+              {job.error || "No error message provided."}
+            </p>
+          </div>
+        )}
+
       
 
       {/* Job Metadata */}
@@ -943,7 +1108,14 @@ const JobDetails = ({ job }) => {
           <div>
             <span className="text-gray-500">Created:</span>
             <span className="ml-2 font-medium text-gray-900">
-              {job.created_at}
+            {new Date(job.created_at).toLocaleString(undefined, {
+              month: "2-digit",
+              day: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true
+            })}
             </span>
           </div>
           <div>
@@ -973,7 +1145,14 @@ const JobDetails = ({ job }) => {
             <div>
               <span className="text-gray-500">Completed:</span>
               <span className="ml-2 font-medium text-gray-900">
-                {job.completed_at}
+              {new Date(job.completed_at).toLocaleString(undefined, {
+              month: "2-digit",
+              day: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true
+            })}
               </span>
             </div>
           )}
