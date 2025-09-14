@@ -51,8 +51,8 @@ class AuditResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.String, db.ForeignKey("jobs.id"), nullable=False)
     
-    accuracy = db.Column(db.String, nullable=False)   
-    issues = db.Column(JSON, nullable=False)           # list of strings
+    accuracy = db.Column(db.String, nullable=True)   
+    issues = db.Column(JSON, nullable=True)         
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
     error = db.Column(db.Text, nullable=True)
 

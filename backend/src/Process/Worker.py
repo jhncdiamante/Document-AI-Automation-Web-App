@@ -43,7 +43,7 @@ class Worker:
                 recognized_texts = self.ocr.get_recognized_texts(image_np)
                 pages_read.append(Page(content=recognized_texts))
 
-            document_type = self.classifier.classify(pages_read).strip().lower()
+            document_type = (self.classifier.classify(pages_read) or "").strip().lower()
 
             if document_type == "death registration worksheet":
                 document = DeathRegistrationWorksheet(pages=pages_read)
@@ -65,7 +65,6 @@ class Worker:
         self._emit_to_frontend("job_progress", {
             "id": job_record.id,
             "status": "processing",
-            "user_id": job_record.user_id,
         })
 
         try:
@@ -97,7 +96,6 @@ class Worker:
             db.session.commit()
 
             result = {
-                "user_id": job_record.user_id,
                 "id": job_record.id,
                 "status": "completed",
                 "accuracy": audit.accuracy,
@@ -107,16 +105,21 @@ class Worker:
 
         except Exception as e:
             db.session.rollback()
+
             job_record.status = "failed"
             job_record.error = str(e)
+
+            db.session.add(job_record)  
+            audit = AuditResult(job_id=job_record.id)
+
+            db.session.add(audit)
             db.session.commit()
 
             result = {
-                "user_id": job_record.user_id,
                 "id": job_record.id,
                 "status": job_record.status,
                 "error": job_record.error,
-                "completed_at": job_record.completed_at.isoformat()
+                "completed_at": audit.completed_at.isoformat()
             }
             self._emit_to_frontend("job_failed", result)
             return result

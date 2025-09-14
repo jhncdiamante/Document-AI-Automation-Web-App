@@ -138,6 +138,8 @@ def get_jobs():
         for j in jobs
     ])
 
+    return jsonify({"error": "No Jobs found with the user ID."})
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()

@@ -69,7 +69,9 @@ class Jobs:
             job_record.status = "canceled"
             db.session.commit()
 
-            return jsonify({"message": f"Job {job_id} canceled successfully"})
+            return jsonify({"success": f"Job {job_id} canceled successfully"})
+        return jsonify({"error": f"Failed to cancel Job {job_id}."}), 400
+ 
 
     def add(self, request):
         files = request.files.getlist("files")
@@ -122,7 +124,7 @@ class Jobs:
                     "description": job_record.description,
                     "created_at": job_record.created_at.isoformat(),
                     "id": job_record.id,
-                    "files": files
+                    "files": [file.filename for file in files]
                 },
                 room=f"user_{job_record.user_id}",
             )
@@ -144,3 +146,5 @@ class Jobs:
             db.session.commit()
 
             return jsonify({"success": f"Job {job_id} deleted."})
+        return jsonify({"error": f"Failed to delete Job {job_id}."}), 400
+        

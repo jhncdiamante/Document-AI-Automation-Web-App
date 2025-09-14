@@ -7,7 +7,7 @@ from backend.src.LLM.Models.IModel import IModel
 
 
 class ChatGPTAI(IModel):
-    def __init__(self, model_name: str = "gpt-4.1-mini"):
+    def __init__(self, model_name: str = "gpt-4.1"):
         load_dotenv()
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:

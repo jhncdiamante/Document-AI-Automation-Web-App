@@ -75,30 +75,28 @@ const FuneralAuditDashboard = () => {
 
   const [confirmAction, setConfirmAction] = useState(null);
   useEffect(() => {
+    if (!isLoggedIn) return; // only run once logged in
+  
     async function fetchJobs() {
       try {
         const res = await fetch("http://localhost:5000/user/jobs", {
           method: "GET",
-          credentials: "include",   // 🔑 send cookies/session to Flask
-          headers: {
-            "Content-Type": "application/json",
-          },
+          credentials: "include",
         });
-  
-        if (!res.ok) {
-          // handle unauthorized / server errors gracefully
-          console.error("Server returned:", res.status);
-          return;
+        if (res.ok) {
+          const data = await res.json();
+          setJobs(data);
+        } else {
+          console.error("Jobs fetch failed:", res.status);
         }
-  
-        const data = await res.json();
-        setJobs(data);
       } catch (err) {
         console.error("Failed to fetch jobs:", err);
       }
     }
+  
     fetchJobs();
-  }, []);
+  }, [isLoggedIn]); 
+  
   
   
 
@@ -220,7 +218,6 @@ const FuneralAuditDashboard = () => {
     const username = formData.get("username");
     const password = formData.get("password");
 
-    // Prepare form-encoded data for Flask
     const data = new URLSearchParams();
     data.append("username", username);
     data.append("password", password);
@@ -229,7 +226,7 @@ const FuneralAuditDashboard = () => {
       const response = await fetch("http://localhost:5000/login", {
         method: "POST",
         body: data, // backend expects form data
-        credentials: "include", // very important for session cookie
+        credentials: "include", 
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
