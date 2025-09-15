@@ -49,7 +49,7 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
 
-socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True)
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True, async_mode="eventlet")
 worker = Worker(socketio=socketio)
 jobs = Jobs(app, worker, socketio)
 
@@ -173,7 +173,7 @@ def serve(path):
 
 if __name__ == "__main__":
         
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, server_options={"async_mode":"eventlet"})
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
 
 
