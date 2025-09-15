@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -7,9 +9,7 @@ from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import timedelta
 import os
-import eventlet
 import eventlet.wsgi
-eventlet.monkey_patch()
 
 from flask import send_from_directory
 
