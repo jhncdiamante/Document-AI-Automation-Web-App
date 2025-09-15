@@ -48,7 +48,7 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
+CORS(app, origins=["https://document-ai-automation-web-app-q38e.vercel.app/"], supports_credentials=True)
 
 socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True, async_mode="eventlet")
 worker = Worker(socketio=socketio)
