@@ -7,6 +7,9 @@ from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import timedelta
 import os
+import eventlet
+import eventlet.wsgi
+
 from flask import send_from_directory
 
 
