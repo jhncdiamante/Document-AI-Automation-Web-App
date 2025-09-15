@@ -71,17 +71,16 @@ with app.app_context():
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
 @app.route('/login', methods=['POST'])
 def login():
-    
     username = request.form.get('username')
     password = request.form.get('password')
 
     user = User.query.filter_by(username=username).first()
-    
+
     if user and bcrypt.check_password_hash(user.password, password):
-        login_user(user)
+        login_user(user, remember=True)  # ensures Flask-Login remembers user
+        session.permanent = True         # ensures Flask-Session persists the session
         return jsonify({"message": "Login successful", "username": user.username}), 200
     else:
         return jsonify({"message": "Invalid credentials"}), 401
