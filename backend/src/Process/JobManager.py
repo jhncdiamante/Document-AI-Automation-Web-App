@@ -30,7 +30,7 @@ class Jobs:
                 continue
 
             with self.app.app_context():
-                job_record = JobModel.query.get(job_id)
+                job_record = self._fetch_job(job_id)
                 if not job_record:
                     self.queue.task_done()
                     continue
@@ -48,7 +48,6 @@ class Jobs:
                 except Exception as e:
                     job_record.status = "failed"
                     job_record.error = str(e)
-                    print(f"Job {job_id} failed: {e}")
                 finally:
                     db.session.commit()
                     self.queue.task_done()
@@ -70,7 +69,6 @@ class Jobs:
             db.session.commit()
 
             return jsonify({"success": f"Job {job_id} canceled successfully"})
-        return jsonify({"error": f"Failed to cancel Job {job_id}."}), 400
  
 
     def add(self, request):
@@ -79,13 +77,23 @@ class Jobs:
 
         with self.app.app_context():
             job_id = str(uuid.uuid4())
+
+            case_number = request.form.get("case_number", "")
+
+            branch = request.form.get("branch", "")
+            description = request.form.get("description", "")
+            feature = request.form.get("feature", "")
+
+            if not all([branch, description, feature]):
+                return jsonify({"error": "Failed to add job, missing at least one attribute."}), 400
+
             job_record = JobModel(
                 id=job_id,
-                case_number=request.form.get("case_number"),
-                branch=request.form.get("branch"),
-                description=request.form.get("description"),
+                case_number=case_number,
+                branch=branch,
+                description=,
                 status="queued",
-                feature=request.form.get("feature"),
+                feature=feature,
                 user_id=current_user.id,
             )
             db.session.add(job_record)
@@ -116,7 +124,6 @@ class Jobs:
             self.socketio.emit(
                 "new_job",
                 {
-                    "user_id": job_record.user_id,
                     "status": job_record.status,
                     "case_number": job_record.case_number,
                     "branch": job_record.branch,
@@ -129,8 +136,8 @@ class Jobs:
                 room=f"user_{job_record.user_id}",
             )
 
-            return job_record
-
+            return jsonify({"success": "Successfully added job."}), 
+            
     def delete(self, job_id):
         with self.app.app_context():
             job_record = self._fetch_job(job_id)
@@ -142,9 +149,13 @@ class Jobs:
                     {"error": f"Job {job_id} is still {job_record.status}, cannot delete"}
                 ), 400
 
-            db.session.delete(job_record)  # cascade deletes children
+            for upload in job_record.uploads:
+                if upload.file_path and os.path.exists(upload.file_path):
+                    os.remove(upload.file_path)
+
+
+            db.session.delete(job_record) 
             db.session.commit()
 
             return jsonify({"success": f"Job {job_id} deleted."})
-        return jsonify({"error": f"Failed to delete Job {job_id}."}), 400
         

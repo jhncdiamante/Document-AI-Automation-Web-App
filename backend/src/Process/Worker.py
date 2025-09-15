@@ -74,7 +74,7 @@ class Worker:
             # run feature logic
             if job_record.feature.lower() == "general":
                 feature_results = self.general_audit.audit(documents[0])
-            elif job_record.feature.lower() == "comparison":
+            elif job_record.feature.lower() == "cross-check":
                 feature_results = self.comparer.compare(
                     document1=documents[0], document2=documents[1]
                 )

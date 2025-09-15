@@ -7,6 +7,8 @@ from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import timedelta
 import os
+from flask import send_from_directory
+
 
 from flask_socketio import join_room
 
@@ -96,9 +98,8 @@ def handle_connect():
 @app.route("/user/add_job", methods=["POST"])
 @login_required
 def add_job():
-    job = jobs.add(request)
+    return jobs.add(request)
     
-    return jsonify({"result": "Success"})
 
 @app.route("/user/jobs/<job_id>/stop", methods=["POST"])
 @login_required
@@ -140,22 +141,34 @@ def get_jobs():
 
     return jsonify({"error": "No Jobs found with the user ID."})
 
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve(path):
+    # __file__ is application.py in root
+    build_dir = os.path.join(os.path.dirname(__file__), "frontend", "build")
+    if path != "" and os.path.exists(os.path.join(build_dir, path)):
+        return send_from_directory(build_dir, path)
+    else:
+        return send_from_directory(build_dir, "index.html")
+
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
 
         # Only create admin if it doesn't exist
-        if not User.query.filter_by(username="admin1").first():
-            hashed = bcrypt.generate_password_hash("password").decode("utf-8")
-            u = User(username="admin", password=hashed)
+        if not User.query.filter_by(username="admin").first():
+            hashed = bcrypt.generate_password_hash("bfsadmin").decode("utf-8")
+            u = User(username="bestfuneralservices", password=hashed)
             db.session.add(u)
             db.session.commit()
             print("Created admin user:", u.username)
         else:
             print("Admin user already exists")
 
-        # Verify
-        print("All users:", User.query.all())
 
         
 

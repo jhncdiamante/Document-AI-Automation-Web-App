@@ -1,15 +1,16 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Listbox } from "@headlessui/react";
 import { Check, ChevronDown } from "lucide-react";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
-
+import { motion, AnimatePresence } from "framer-motion";
 
 import { io } from "socket.io-client";
 
 const socket = io("http://localhost:5000", {
   withCredentials: true,
-  transports: ["websocket"], // optional but helps avoid polling issues
+  transports: ["websocket"],
 });
 
 import {
@@ -62,23 +63,21 @@ const getStatusIcon = (status) => {
   }
 };
 
-
-
 const FuneralAuditDashboard = () => {
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [showAddJob, setShowAddJob] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobs, setJobs] = useState([]);
-
-
+  const [jobsLoading, setJobsLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
+
   useEffect(() => {
-    if (!isLoggedIn) return; // only run once logged in
-  
+    if (!isLoggedIn) return;
+
     async function fetchJobs() {
       try {
+        setJobsLoading(true);
         const res = await fetch("http://localhost:5000/user/jobs", {
           method: "GET",
           credentials: "include",
@@ -91,39 +90,40 @@ const FuneralAuditDashboard = () => {
         }
       } catch (err) {
         console.error("Failed to fetch jobs:", err);
+      } finally {
+        setJobsLoading(false);
       }
     }
-  
+
     fetchJobs();
-  }, [isLoggedIn]); 
-  
-  
-  
+  }, [isLoggedIn]);
 
   const handleAction = (type, job) => {
-    setConfirmAction({ type, job }); // open confirmation modal
+    setConfirmAction({ type, job });
   };
 
   const confirmJobAction = async () => {
-    if (!confirmAction || !confirmAction.job) return;
+    if (!confirmAction) return;
 
     try {
       if (confirmAction.type === "delete") {
         await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/delete`, {
           method: "DELETE",
-          credentials: 'include',
+          credentials: "include",
         });
         setJobs((prev) => prev.filter((j) => j.id !== confirmAction.job.id));
       } else if (confirmAction.type === "stop") {
         await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/stop`, {
           method: "POST",
-          credentials: 'include',
+          credentials: "include",
         });
         setJobs((prev) =>
           prev.map((j) =>
             j.id === confirmAction.job.id ? { ...j, status: "stopped" } : j
           )
         );
+      } else if (confirmAction.type === "logout") {
+        await handleLogout();
       }
     } catch (err) {
       console.error("Action failed:", err);
@@ -132,12 +132,10 @@ const FuneralAuditDashboard = () => {
     }
   };
 
-  
   useEffect(() => {
-    // Listen for backend job updates
     socket.on("new_job", (jobData) => {
       console.log("New job received:", jobData);
-      setJobs((prevJobs) => [...prevJobs, jobData]); // append new job
+      setJobs((prevJobs) => [...prevJobs, jobData]);
     });
 
     socket.on("job_update", (updatedJob) => {
@@ -174,9 +172,9 @@ const FuneralAuditDashboard = () => {
       socket.off("job_update");
       socket.off("job_progress");
       socket.off("job_failed");
-
     };
   }, []);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -186,7 +184,7 @@ const FuneralAuditDashboard = () => {
           method: "GET",
           credentials: "include",
         });
-  
+
         if (res.ok) {
           const data = await res.json();
           setIsLoggedIn(true);
@@ -197,23 +195,19 @@ const FuneralAuditDashboard = () => {
       } catch (err) {
         console.error("Session check failed:", err);
       } finally {
-        setLoading(false); // <-- finished loading
+        setLoading(false);
       }
     };
-  
+
     checkSession();
   }, []);
-  
+
   const fileInputRef = useRef(null);
 
-  const branches = [
-    "Phoenix",
-    "Peoria",
-  ];
+  const branches = ["Phoenix", "Peoria"];
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    // Get values from the form
     const formData = new FormData(e.target);
     const username = formData.get("username");
     const password = formData.get("password");
@@ -221,17 +215,17 @@ const FuneralAuditDashboard = () => {
     const data = new URLSearchParams();
     data.append("username", username);
     data.append("password", password);
-    
+
     try {
       const response = await fetch("http://localhost:5000/login", {
         method: "POST",
-        body: data, // backend expects form data
-        credentials: "include", 
+        body: data,
+        credentials: "include",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
-  
+
       if (response.ok) {
         setIsLoggedIn(true);
       } else {
@@ -248,11 +242,11 @@ const FuneralAuditDashboard = () => {
     try {
       const res = await fetch("http://localhost:5000/logout", {
         method: "POST",
-        credentials: "include", // include cookie so Flask knows which session
+        credentials: "include",
       });
-  
+
       if (res.ok) {
-        setIsLoggedIn(false);  // reset local state
+        setIsLoggedIn(false);
         console.log("Logged out successfully");
       } else {
         console.error("Logout failed");
@@ -261,8 +255,6 @@ const FuneralAuditDashboard = () => {
       console.error("Error logging out:", err);
     }
   };
-  
-  
 
   const handleAddJob = (jobData) => {
     const newJob = {
@@ -273,73 +265,144 @@ const FuneralAuditDashboard = () => {
     setJobs([...jobs, newJob]);
     setShowAddJob(false);
   };
-  if (loading) return null; 
+
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center"
+      >
+        <motion.div
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full"
+        />
+      </motion.div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4"
+      >
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 w-full max-w-md shadow-2xl"
+        >
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+              className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            >
               <FileCheck className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">
+            </motion.div>
+            <motion.h1
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="text-2xl font-bold text-white mb-2"
+            >
               Document Audit
-            </h1>
-            <p className="text-white/70">Funeral Service Document Management</p>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="text-white/70"
+            >
+              Funeral Service Document Management
+            </motion.p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            onSubmit={handleLogin}
+            className="space-y-6"
+          >
+            <motion.div
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.9 }}
+            >
               <label className="block text-white/80 text-sm font-medium mb-2">
                 Email
               </label>
               <input
                 type="text"
                 name="username"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 placeholder="admin@funeralservice.com"
                 required
               />
-            </div>
+            </motion.div>
 
-            <div>
+            <motion.div
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 1.0 }}
+            >
               <label className="block text-white/80 text-sm font-medium mb-2">
                 Password
               </label>
               <input
                 type="password"
                 name="password"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 placeholder="••••••••"
                 required
               />
-            </div>
+            </motion.div>
 
-            <button
+            <motion.button
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.1 }}
               type="submit"
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-[1.02]"
             >
               Sign In
-            </button>
-          </form>
-        </div>
-      </div>
+            </motion.button>
+          </motion.form>
+        </motion.div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-gray-50"
+    >
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
+        className="bg-white border-b border-gray-200 px-6 py-4"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <motion.div
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.5 }}
+              className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center"
+            >
               <FileCheck className="w-6 h-6 text-white" />
-            </div>
+            </motion.div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
-                Best Funeral Services
-              </h1>
+              <h1 className="text-xl font-bold text-gray-900">Best Funeral Services</h1>
               <p className="text-sm text-gray-500">Document Auditing System</p>
             </div>
           </div>
@@ -350,255 +413,342 @@ const FuneralAuditDashboard = () => {
               <input
                 type="text"
                 placeholder="Search documents..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
             </div>
 
             <div className="flex items-center space-x-3">
-              <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                <Settings className="w-5 h-5" />
-              </button>
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
-              <button
-                onClick={() => {
-                  handleLogout();
-                  setIsLoggedIn(false);
-                }}
-              
-                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
               >
-               <LogOut
-              className="w-5 h-5 cursor-pointer hover:text-red-500"
-            />
-              </button>
+                <Settings className="w-5 h-5" />
+              </motion.button>
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center"
+              >
+                <User className="w-4 h-4 text-white" />
+              </motion.div>
+              <motion.button
+                whileHover={{ scale: 1.1, color: "#ef4444" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleAction("logout")}
+                className="p-2 text-gray-400 hover:text-red-600 transition-colors duration-200"
+              >
+                <LogOut className="w-5 h-5" />
+              </motion.button>
             </div>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-screen p-6">
+        <motion.aside
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="w-64 bg-white border-r border-gray-200 min-h-screen p-6"
+        >
           <nav className="space-y-2">
-            
-
-            <button
+            <motion.button
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setShowAddJob(true)}
-              className="mt-5 w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+              className="mt-5 w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <Plus className="w-5 h-5" />
               <span>Add New Job</span>
-            </button>
+            </motion.button>
           </nav>
-        </aside>
+        </motion.aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <motion.main
+          initial={{ x: 20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="flex-1 p-6"
+        >
           <div className="mb-6">
-            
             <div className="flex items-center space-x-2">
-              <button className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-all duration-200"
+              >
                 <Filter className="w-3.5 h-3.5" />
                 <span>Filter</span>
-              </button>
+              </motion.button>
             </div>
-
           </div>
 
-         {/* Jobs Grid */}
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {jobs.filter((job) => !selectedBranch || job.branch === selectedBranch).length === 0 ? (
-    <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
-      <FileText className="w-12 h-12 mb-4 text-gray-400" />
-      <p className="text-lg font-medium">No job entries</p>
-      <p className="text-sm text-gray-400">Start by adding a new audit job.</p>
-    </div>
-  ) : (
-    jobs
-      .filter((job) => !selectedBranch || job.branch === selectedBranch)
-      .map((job) => (
-        <div
-          key={job.id}
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-[1.02]"
-          onClick={() => setSelectedJob(job)}
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">{job.case_number}</h3>
-                <p className="text-xs text-gray-500">{job.branch}</p>
-              </div>
-            </div>
-            {/* Actions Menu */}
-<Menu as="div" className="relative inline-block text-left">
-  <div>
-    <Menu.Button
-     onClick={(e) => e.stopPropagation()}
-     className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
-      <MoreVertical className="w-4 h-4" />
-    </Menu.Button>
-  </div>
-
-  <Transition
-    as={Fragment}
-    enter="transition ease-out duration-100"
-    enterFrom="transform opacity-0 scale-95"
-    enterTo="transform opacity-100 scale-100"
-    leave="transition ease-in duration-75"
-    leaveFrom="transform opacity-100 scale-100"
-    leaveTo="transform opacity-0 scale-95"
-  >
-    <Menu.Items className="absolute right-0 mt-2 w-32 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
-   
-      {job.status === "completed" || job.status === "stopped" ? (
-        <Menu.Item>
-          {({ active }) => (
-            <button
-            onClick={(e) => {
-              e.stopPropagation();   
-              handleAction("delete", job);
-            }}
-            
-              
-              className={`${
-                active ? "bg-red-50 text-red-600" : "text-red-500"
-              } w-full text-left px-4 py-2 text-sm rounded-lg`}
-            >
-              Delete
-            </button>
-          )}
-        </Menu.Item>
-      ) : (
-        <Menu.Item>
-          {({ active }) => (
-            <button
-            onClick={(e) => {
-              e.stopPropagation();  
-              handleAction("stop", job);
-            }}
-            
-              className={`${
-                active ? "bg-yellow-50 text-yellow-600" : "text-yellow-500"
-              } w-full text-left px-4 py-2 text-sm rounded-lg`}
-            >
-              Stop
-            </button>
-          )}
-        </Menu.Item>
-      )}
-    </Menu.Items>
-  </Transition>
-</Menu>
-
-          </div>
-
-          {/* 🔹 enforce equal height */}
-          <div className="space-y-3 min-h-[180px] flex flex-col justify-between">
-            <div>
-              <div
-                className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}
+          {/* Jobs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {jobsLoading ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500"
               >
-                {getStatusIcon(job.status)}
-                <span className="capitalize">{job.status}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm mt-3">
-                <div>
-                  <p className="text-gray-500">Files</p>
-                  <p className="font-semibold text-gray-900">
-                    {Array.isArray(job.files) ? job.files.length : 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Type</p>
-                  <p className="font-semibold text-gray-900 capitalize">
-                    {job.feature}
-                  </p>
-                </div>
-              </div>
-
-              {job.status === "completed" && (
-                <div className="grid grid-cols-2 gap-4 text-sm mt-3">
-                  <div>
-                    <p className="text-gray-500">Accuracy</p>
-                    <p
-                      className={`font-semibold ${
-                        parseInt(job.accuracy) >= 80
-                          ? "text-green-600"
-                          : parseInt(job.accuracy) >= 50
-                          ? "text-yellow-500"
-                          : "text-red-600"
-                      }`}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                >
+                  <Clock className="w-12 h-12 mb-4 text-gray-400" />
+                </motion.div>
+                <p className="text-lg font-medium">Loading jobs...</p>
+              </motion.div>
+            ) : jobs.filter((job) => !selectedBranch || job.branch === selectedBranch).length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+                className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500"
+              >
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <FileText className="w-12 h-12 mb-4 text-gray-400" />
+                </motion.div>
+                <p className="text-lg font-medium">No job entries</p>
+                <p className="text-sm text-gray-400">Start by adding a new audit job.</p>
+              </motion.div>
+            ) : (
+              <AnimatePresence>
+                {jobs
+                  .filter((job) => !selectedBranch || job.branch === selectedBranch)
+                  .map((job, index) => (
+                    <motion.div
+                      key={job.id}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                      transition={{ delay: index * 0.1, duration: 0.3 }}
+                      whileHover={{ scale: 1.02, y: -5 }}
+                      className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-300 cursor-pointer"
+                      onClick={() => setSelectedJob(job)}
                     >
-                      {job.accuracy}
-                    </p>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <motion.div
+                            transition={{ duration: 0.5 }}
+                            className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center"
+                          >
+                            <FileText className="w-5 h-5 text-white" />
+                          </motion.div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 text-sm">{job.case_number}</h3>
+                            <p className="text-xs text-gray-500">{job.branch}</p>
+                          </div>
+                        </div>
 
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Issues</p>
-                    <p
-                      className={`font-semibold ${
-                        Array.isArray(job.issues) && job.issues.length === 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {Array.isArray(job.issues) ? job.issues.length : 0}
-                    </p>
-                  </div>
-                </div>
-              )}
+                        {/* Actions Menu */}
+                        <Menu as="div" className="relative inline-block text-left">
+                          <div>
+                            <Menu.Button
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-all duration-200"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Menu.Button>
+                          </div>
 
-                {job.status === "failed" && (
-                  <div className="mt-3 text-sm text-red-600">
-                    <p className="font-semibold">Audit Failed</p>
-                    <p>{job.error || "An unexpected error occurred during audit."}</p>
-                  </div>
-                )}
-            </div>
+                          <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-200"
+                            enterFrom="transform opacity-0 scale-95"
+                            enterTo="transform opacity-100 scale-100"
+                            leave="transition ease-in duration-150"
+                            leaveFrom="transform opacity-100 scale-100"
+                            leaveTo="transform opacity-0 scale-95"
+                          >
+                            <Menu.Items className="absolute right-0 mt-2 w-32 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
+                              {job.status === "completed" || job.status === "stopped" ? (
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <motion.button
+                                      whileHover={{ scale: 1.02 }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAction("delete", job);
+                                      }}
+                                      className={`${
+                                        active ? "bg-red-50 text-red-600" : "text-red-500"
+                                      } w-full text-left px-4 py-2 text-sm rounded-lg transition-all duration-150`}
+                                    >
+                                      Delete
+                                    </motion.button>
+                                  )}
+                                </Menu.Item>
+                              ) : (
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <motion.button
+                                      whileHover={{ scale: 1.02 }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAction("stop", job);
+                                      }}
+                                      className={`${
+                                        active ? "bg-yellow-50 text-yellow-600" : "text-yellow-500"
+                                      } w-full text-left px-4 py-2 text-sm rounded-lg transition-all duration-150`}
+                                    >
+                                      Stop
+                                    </motion.button>
+                                  )}
+                                </Menu.Item>
+                              )}
+                            </Menu.Items>
+                          </Transition>
+                        </Menu>
+                      </div>
 
-            {/* 🔹 Stick to bottom */}
-            {job.status === "processing" && (
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mt-3">
-                <div
-                  className="h-2 w-full rounded-full
-                    bg-gradient-to-r from-blue-600 via-blue-400 to-blue-500
-                    bg-[length:200%_100%] animate-shimmer"
-                ></div>
-              </div>
+                      <div className="space-y-3 min-h-[180px] flex flex-col justify-between">
+                        <div>
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                              job.status
+                            )}`}
+                          >
+                            {getStatusIcon(job.status)}
+                            <span className="capitalize">{job.status}</span>
+                          </motion.div>
+
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.3 }}
+                            className="grid grid-cols-2 gap-4 text-sm mt-3"
+                          >
+                            <div>
+                              <p className="text-gray-500">Files</p>
+                              <p className="font-semibold text-gray-900">
+                                {Array.isArray(job.files) ? job.files.length : 0}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Type</p>
+                              <p className="font-semibold text-gray-900 capitalize">{job.feature}</p>
+                            </div>
+                          </motion.div>
+
+                          {job.status === "completed" && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.4 }}
+                              className="grid grid-cols-2 gap-4 text-sm mt-3"
+                            >
+                              <div>
+                                <p className="text-gray-500">Accuracy</p>
+                                <p
+                                  className={`font-semibold ${
+                                    parseInt(job.accuracy) >= 80
+                                      ? "text-green-600"
+                                      : parseInt(job.accuracy) >= 50
+                                      ? "text-yellow-500"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {job.accuracy}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Issues</p>
+                                <p
+                                  className={`font-semibold ${
+                                    Array.isArray(job.issues) && job.issues.length === 0
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {Array.isArray(job.issues) ? job.issues.length : 0}
+                                </p>
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {job.status === "failed" && (
+                            <motion.div
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.4 }}
+                              className="mt-3 text-sm text-red-600"
+                            >
+                              <p className="font-semibold">Audit Failed</p>
+                              <p>{job.error || "An unexpected error occurred during audit."}</p>
+                            </motion.div>
+                          )}
+                        </div>
+
+                        {job.status === "processing" && (
+                          <motion.div
+                            initial={{ scaleX: 0 }}
+                            animate={{ scaleX: 1 }}
+                            transition={{ delay: 0.5, duration: 0.8 }}
+                            className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mt-3"
+                          >
+                            <motion.div
+                              animate={{
+                                x: ["0%", "100%", "0%"],
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                              className="h-2 w-1/3 rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-blue-500"
+                            />
+                          </motion.div>
+                        )}
+
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.6 }}
+                          className="pt-2 border-t border-gray-100 mt-auto"
+                        >
+                          <p className="text-xs text-gray-500">
+                            Created:{" "}
+                            {new Date(job.created_at).toLocaleString(undefined, {
+                              month: "2-digit",
+                              day: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </p>
+                          {job.completed_at && (
+                            <p className="text-xs text-gray-500">
+                              Completed:{" "}
+                              {new Date(job.completed_at).toLocaleString(undefined, {
+                                month: "2-digit",
+                                day: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </p>
+                          )}
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  ))}
+              </AnimatePresence>
             )}
-            <div className="pt-2 border-t border-gray-100 mt-auto">
-              <p className="text-xs text-gray-500">Created: {new Date(job.created_at).toLocaleString(undefined, {
-              month: "2-digit",
-              day: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true
-            })}</p>
-              {job.completed_at && (
-                <p className="text-xs text-gray-500">Completed: {new Date(job.completed_at).toLocaleString(undefined, {
-                  month: "2-digit",
-                  day: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true
-                })}</p>
-              )}
-            </div>
           </div>
-        </div>
-      ))
-  )}
-</div>
-
-        </main>
+        </motion.main>
       </div>
 
       {/* Add Job Modal */}
@@ -650,40 +800,47 @@ const FuneralAuditDashboard = () => {
         </div>
       )}
     {confirmAction && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-lg">
-          <h3 className="text-lg font-bold text-gray-900 mb-3">
-            Confirm {confirmAction.type === "delete" ? "Deletion" : "Stop"}
-          </h3>
-          <p className="text-sm text-gray-600 mb-6">
-            Are you sure you want to{" "}
-            {confirmAction.type === "delete"
-              ? "delete this completed job"
-              : "stop this running job"}
-            ?
-          </p>
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={() => setConfirmAction(null)}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={confirmJobAction}
-              className={`px-4 py-2 rounded-lg text-white ${
-                confirmAction.type === "delete"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-yellow-500 hover:bg-yellow-600"
-              }`}
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-lg">
+      <h3 className="text-lg font-bold text-gray-900 mb-3">
+        {confirmAction.type === "delete"
+          ? "Confirm Deletion"
+          : confirmAction.type === "stop"
+          ? "Confirm Stop"
+          : "Confirm Logout"}
+      </h3>
+      <p className="text-sm text-gray-600 mb-6">
+        {confirmAction.type === "delete"
+          ? "Are you sure you want to delete this completed job?"
+          : confirmAction.type === "stop"
+          ? "Are you sure you want to stop this running job?"
+          : "Are you sure you want to sign out of your account?"}
+      </p>
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => setConfirmAction(null)}
+          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmJobAction}
+          className={`px-4 py-2 rounded-lg text-white ${
+            confirmAction.type === "delete"
+              ? "bg-red-600 hover:bg-red-700"
+              : confirmAction.type === "stop"
+              ? "bg-yellow-500 hover:bg-yellow-600"
+              : "bg-red-600 hover:bg-red-700"
+          }`}
+        >
+          Confirm
+        </button>
       </div>
-    )}
     </div>
+  </div>
+)}
+
+    </motion.div>
   );
 };
 
@@ -762,7 +919,7 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
               className="hidden"
             />
             <span className="text-lg font-semibold text-gray-900">
-              General Audit
+              General
             </span>
             <span className="text-sm text-gray-500">
               Standard checks for one document
@@ -773,25 +930,25 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
           <label
             className={`cursor-pointer flex flex-col items-center justify-center rounded-2xl border p-6 transition-all duration-200 shadow-sm
           ${
-            formData.feature === "comparison"
+            formData.feature === "cross-check"
               ? "border-purple-600 bg-purple-50 ring-2 ring-purple-500"
               : "border-gray-200 hover:border-purple-400 hover:bg-gray-50"
           }`}
           >
             <input
               type="radio"
-              value="comparison"
-              checked={formData.feature === "comparison"}
+              value="cross-check"
+              checked={formData.feature === "cross-check"}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, feature: e.target.value }))
               }
               className="hidden"
             />
             <span className="text-lg font-semibold text-gray-900">
-              Document Comparison
+                Cross-check
             </span>
             <span className="text-sm text-gray-500">
-              Cross-check 2 files side by side
+              Compare 2 files side by side
             </span>
           </label>
         </div>
@@ -964,9 +1121,11 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
         <button
           type="button" // change from "submit" to "button" to prevent default form submission
           onClick={async () => {
-            //if (formData.feature == "comparison" && formData.files.length != 2) return alert("Two files only are accepted in Comparison Feature.");
-            //if (formData.files.length === 0) return alert("Please upload at least one file.");
+            if (formData.feature == "cross-check" && formData.files.length != 2) return alert("Two files only are accepted in Cross-check Feature.");
+            if (formData.files.length === 0) return alert("Please upload at least one file.");
             if (formData.case_number.trim() == "")
+              return alert("Case number is required.");
+            if (formData.feature.trim() == "")
               return alert("Case number is required.");
 
             const data = new FormData();
