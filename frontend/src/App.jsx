@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5000", {
+const socket = io("http://52.87.168.6:5000/", {
   withCredentials: true,
   transports: ["websocket"],
 });
@@ -78,7 +78,7 @@ const FuneralAuditDashboard = () => {
     async function fetchJobs() {
       try {
         setJobsLoading(true);
-        const res = await fetch("http://localhost:5000/user/jobs", {
+        const res = await fetch("http://52.87.168.6:5000/user/jobs", {
           method: "GET",
           credentials: "include",
         });
@@ -107,13 +107,13 @@ const FuneralAuditDashboard = () => {
 
     try {
       if (confirmAction.type === "delete") {
-        await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/delete`, {
+        await fetch(`http://52.87.168.6:5000/user/jobs/${confirmAction.job.id}/delete`, {
           method: "DELETE",
           credentials: "include",
         });
         setJobs((prev) => prev.filter((j) => j.id !== confirmAction.job.id));
       } else if (confirmAction.type === "stop") {
-        await fetch(`http://localhost:5000/user/jobs/${confirmAction.job.id}/stop`, {
+        await fetch(`http://52.87.168.6:5000/user/jobs/${confirmAction.job.id}/stop`, {
           method: "POST",
           credentials: "include",
         });
@@ -180,7 +180,7 @@ const FuneralAuditDashboard = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const res = await fetch("http://localhost:5000/me", {
+        const res = await fetch("http://52.87.168.6:5000/me", {
           method: "GET",
           credentials: "include",
         });
@@ -217,7 +217,7 @@ const FuneralAuditDashboard = () => {
     data.append("password", password);
 
     try {
-      const response = await fetch("http://localhost:5000/login", {
+      const response = await fetch("http://52.87.168.6:5000/login", {
         method: "POST",
         body: data,
         credentials: "include",
@@ -240,7 +240,7 @@ const FuneralAuditDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:5000/logout", {
+      const res = await fetch("http://52.87.168.6:5000/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -1139,7 +1139,7 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
             
             try {
               const response = await fetch(
-                "http://localhost:5000/user/add_job",
+                "http://52.87.168.6:5000/user/add_job",
                 {
                   method: "POST",
                   credentials: 'include',

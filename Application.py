@@ -53,6 +53,20 @@ jobs = Jobs(app, worker, socketio)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
+
+with app.app_context():
+    db.create_all()
+
+    # Only create admin if it doesn't exist
+    if not User.query.filter_by(username="bestfuneralservices").first():
+        hashed = bcrypt.generate_password_hash("bfsadmin").decode("utf-8")
+        u = User(username="bestfuneralservices", password=hashed)
+        db.session.add(u)
+        db.session.commit()
+        print("Created admin user:", u.username)    
+    else:
+        print("Admin user already exists")
+
 # --- Flask-Login user loader ---
 @login_manager.user_loader
 def load_user(user_id):
@@ -156,20 +170,6 @@ def serve(path):
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-
-        # Only create admin if it doesn't exist
-        if not User.query.filter_by(username="bestfuneralservices1").first():
-            hashed = bcrypt.generate_password_hash("bfsadmin1").decode("utf-8")
-            u = User(username="bestfuneralservices1", password=hashed)
-            db.session.add(u)
-            db.session.commit()
-            print("Created admin user:", u.username)
-        else:
-            print("Admin user already exists")
-
-
         
 
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
