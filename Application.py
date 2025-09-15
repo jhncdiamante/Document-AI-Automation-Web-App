@@ -46,7 +46,7 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True)
 worker = Worker(socketio=socketio)
 jobs = Jobs(app, worker, socketio)
 
