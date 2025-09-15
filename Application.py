@@ -23,6 +23,7 @@ from backend.src.Process.Worker import Worker
 
 from backend.src.Models import Job as JobModel
 app = Flask(__name__)
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///users.db"
@@ -39,6 +40,7 @@ app.config['SESSION_COOKIE_SECURE'] = False  # True if HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
 
+
 # Init extensions
 bcrypt = Bcrypt(app)
 db.init_app(app)
@@ -48,7 +50,6 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-CORS(app, supports_credentials=True)
 
 socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True, async_mode="eventlet")
 worker = Worker(socketio=socketio)

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { io } from "socket.io-client";
 
-const BASE_URL = "https://52.87.168.6";
+const BASE_URL = "http://52.87.168.6";
 const socket = io(BASE_URL, {
   withCredentials: true,
   transports: ["websocket"],
