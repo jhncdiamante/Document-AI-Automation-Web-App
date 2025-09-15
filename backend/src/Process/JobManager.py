@@ -91,7 +91,7 @@ class Jobs:
                 id=job_id,
                 case_number=case_number,
                 branch=branch,
-                description=,
+                description=description,
                 status="queued",
                 feature=feature,
                 user_id=current_user.id,

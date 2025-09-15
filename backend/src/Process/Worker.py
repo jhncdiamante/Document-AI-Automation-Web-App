@@ -15,7 +15,7 @@ from backend.src.Features.General import GeneralAudit
 
 
 class Worker:
-    def __init__(self, ai_model=None, socketio=None, poppler_path=r"D:\\libraries_and_such\\poppler\\poppler-25.07.0\\Library\\bin"):
+    def __init__(self, ai_model=None, socketio=None, poppler_path=None):
         self.ai = ai_model or ChatGPTAI()
         self.formatter = DocumentFormatter(self.ai)
         self.comparer = DocumentComparison(self.ai)
