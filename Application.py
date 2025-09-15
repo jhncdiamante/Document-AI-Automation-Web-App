@@ -173,6 +173,8 @@ def serve(path):
 
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO)  
         
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
