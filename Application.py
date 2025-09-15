@@ -160,9 +160,9 @@ if __name__ == "__main__":
         db.create_all()
 
         # Only create admin if it doesn't exist
-        if not User.query.filter_by(username="admin").first():
-            hashed = bcrypt.generate_password_hash("bfsadmin").decode("utf-8")
-            u = User(username="bestfuneralservices", password=hashed)
+        if not User.query.filter_by(username="bestfuneralservices1").first():
+            hashed = bcrypt.generate_password_hash("bfsadmin1").decode("utf-8")
+            u = User(username="bestfuneralservices1", password=hashed)
             db.session.add(u)
             db.session.commit()
             print("Created admin user:", u.username)
