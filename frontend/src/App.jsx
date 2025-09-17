@@ -74,11 +74,15 @@ const FuneralAuditDashboard = () => {
       case_number: "FS-2024-001",
       branch: "Phoenix",
       feature: "general",
-      description: "Standard document audit",
+      description: "Death registration worksheet audit",
       status: "completed",
-      files: ["death_certificate.pdf"],
+      files: ["death_registration_worksheet.pdf"],
       accuracy: "92%",
-      issues: ["Minor formatting inconsistency in date field"],
+      issues: [
+        "Decedent name mismatch: Registration worksheet shows 'John A. Smith' but ID document referenced shows 'Johnathan Andrew Smith'",
+        "Missing informant relationship field - required to verify who provided death information",
+        "Date of birth formatting inconsistent with state vital records standard (MM/DD/YYYY required)"
+      ],
       created_at: "2024-01-15T10:30:00Z",
       completed_at: "2024-01-15T10:45:00Z"
     },
@@ -87,9 +91,9 @@ const FuneralAuditDashboard = () => {
       case_number: "FS-2024-002",
       branch: "Peoria",
       feature: "cross-check",
-      description: "Cross-reference validation",
+      description: "Worksheet vs working copy validation",
       status: "processing",
-      files: ["contract.pdf", "invoice.pdf"],
+      files: ["death_registration_worksheet.pdf", "working_copy_certificate.pdf"],
       created_at: "2024-01-15T11:00:00Z"
     },
     {
@@ -97,37 +101,67 @@ const FuneralAuditDashboard = () => {
       case_number: "FS-2024-003",
       branch: "Phoenix",
       feature: "general",
-      description: "Insurance claim review",
+      description: "Working copy certificate review",
       status: "queued",
-      files: ["insurance_form.pdf"],
+      files: ["working_copy_certificate.pdf"],
       created_at: "2024-01-15T11:15:00Z"
-    },
-    {
-      id: 4,
-      case_number: "FS-2024-004",
-      branch: "Peoria",
-      feature: "general",
-      description: "Permit verification",
-      status: "failed",
-      files: ["permit.pdf"],
-      error: "Document format not recognized",
-      created_at: "2024-01-15T11:30:00Z"
     },
     {
       id: 5,
       case_number: "FS-2024-005",
       branch: "Phoenix",
       feature: "cross-check",
-      description: "Financial audit comparison",
+      description: "Registration worksheet to certificate cross-check",
       status: "completed",
-      files: ["receipt1.pdf", "receipt2.pdf"],
+      files: ["death_registration_worksheet.pdf", "working_copy_certificate.pdf"],
       accuracy: "88%",
-      issues: ["Amount discrepancy of $50", "Missing signature on receipt2"],
+      issues: [
+        "Cause of death discrepancy: Worksheet lists 'Cardiac Arrest' but working copy shows 'Myocardial Infarction' - medical terminology inconsistency",
+        "Time of death varies by 15 minutes between documents (worksheet: 11:45 PM, certificate: 12:00 AM)",
+        "Place of death address missing apartment number in worksheet but included in working copy",
+        "Physician signature present on worksheet but missing corresponding medical license number verification"
+      ],
       created_at: "2024-01-15T09:00:00Z",
       completed_at: "2024-01-15T09:20:00Z"
+    },
+    {
+      id: 6,
+      case_number: "FS-2024-006",
+      branch: "Phoenix",
+      feature: "general",
+      description: "Working copy certificate completeness audit",
+      status: "completed",
+      files: ["working_copy_certificate.pdf"],
+      accuracy: "76%",
+      issues: [
+        "Missing funeral director information: Box 23 (funeral director name and license) is blank - required for filing",
+        "Incomplete decedent information: Social security number field shows only partial digits (XXX-XX-1234)",
+        "Burial/cremation authorization missing: No indication of final disposition method selected",
+        "Next of kin contact information incomplete: Phone number field contains only area code",
+        "Medical examiner case number referenced but not provided in appropriate section"
+      ],
+      created_at: "2024-01-15T08:15:00Z",
+      completed_at: "2024-01-15T08:32:00Z"
+    },
+    
+    {
+      id: 8,
+      case_number: "FS-2024-008",
+      branch: "Phoenix",
+      feature: "cross-check",
+      description: "Dual document consistency verification",
+      status: "completed",
+      files: ["death_registration_worksheet.pdf", "working_copy_certificate.pdf"],
+      accuracy: "94%",
+      issues: [
+        "Minor spelling inconsistency: Decedent middle name spelled 'Catherine' in worksheet but 'Kathryn' in certificate",
+        "Date formatting difference: Worksheet uses MM-DD-YYYY while certificate uses MM/DD/YYYY format"
+      ],
+      created_at: "2024-01-15T13:20:00Z",
+      completed_at: "2024-01-15T13:35:00Z"
     }
   ]);
-  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsLoading, setJobsLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
@@ -233,7 +267,7 @@ const FuneralAuditDashboard = () => {
     };
   }, []);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     
