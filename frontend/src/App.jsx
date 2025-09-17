@@ -64,11 +64,69 @@ const getStatusIcon = (status) => {
 };
 
 const FuneralAuditDashboard = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [showAddJob, setShowAddJob] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [jobs, setJobs] = useState([]);
+  const [jobs, setJobs] = useState([
+    {
+      id: 1,
+      case_number: "FS-2024-001",
+      branch: "Phoenix",
+      feature: "general",
+      description: "Standard document audit",
+      status: "completed",
+      files: ["death_certificate.pdf"],
+      accuracy: "92%",
+      issues: ["Minor formatting inconsistency in date field"],
+      created_at: "2024-01-15T10:30:00Z",
+      completed_at: "2024-01-15T10:45:00Z"
+    },
+    {
+      id: 2,
+      case_number: "FS-2024-002",
+      branch: "Peoria",
+      feature: "cross-check",
+      description: "Cross-reference validation",
+      status: "processing",
+      files: ["contract.pdf", "invoice.pdf"],
+      created_at: "2024-01-15T11:00:00Z"
+    },
+    {
+      id: 3,
+      case_number: "FS-2024-003",
+      branch: "Phoenix",
+      feature: "general",
+      description: "Insurance claim review",
+      status: "queued",
+      files: ["insurance_form.pdf"],
+      created_at: "2024-01-15T11:15:00Z"
+    },
+    {
+      id: 4,
+      case_number: "FS-2024-004",
+      branch: "Peoria",
+      feature: "general",
+      description: "Permit verification",
+      status: "failed",
+      files: ["permit.pdf"],
+      error: "Document format not recognized",
+      created_at: "2024-01-15T11:30:00Z"
+    },
+    {
+      id: 5,
+      case_number: "FS-2024-005",
+      branch: "Phoenix",
+      feature: "cross-check",
+      description: "Financial audit comparison",
+      status: "completed",
+      files: ["receipt1.pdf", "receipt2.pdf"],
+      accuracy: "88%",
+      issues: ["Amount discrepancy of $50", "Missing signature on receipt2"],
+      created_at: "2024-01-15T09:00:00Z",
+      completed_at: "2024-01-15T09:20:00Z"
+    }
+  ]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
 
@@ -178,28 +236,7 @@ const FuneralAuditDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/me`, {
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setIsLoggedIn(true);
-          console.log("Session restored for:", data.username);
-        } else {
-          setIsLoggedIn(false);
-        }
-      } catch (err) {
-        console.error("Session check failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkSession();
+    
   }, []);
 
   const fileInputRef = useRef(null);
