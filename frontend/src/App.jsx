@@ -64,7 +64,7 @@ const getStatusIcon = (status) => {
 };
 
 const FuneralAuditDashboard = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [showAddJob, setShowAddJob] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -279,34 +279,8 @@ const FuneralAuditDashboard = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const username = formData.get("username");
-    const password = formData.get("password");
-
-    const data = new URLSearchParams();
-    data.append("username", username);
-    data.append("password", password);
-
-    try {
-      const response = await fetch(`${BASE_URL}/login`, {
-        method: "POST",
-        body: data,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      });
-
-      if (response.ok) {
-        setIsLoggedIn(true);
-      } else {
-        const msg = await response.text();
-        alert(`Login failed: ${msg}`);
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      alert("Something went wrong, try again.");
-    }
+    // Demo mode - just login without validation
+    setIsLoggedIn(true);
   };
 
   const handleLogout = async () => {
@@ -413,7 +387,7 @@ const FuneralAuditDashboard = () => {
                 name="username"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 placeholder="admin@funeralservice.com"
-                required
+                
               />
             </motion.div>
 
@@ -430,7 +404,7 @@ const FuneralAuditDashboard = () => {
                 name="password"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 placeholder="••••••••"
-                required
+                
               />
             </motion.div>
 
@@ -769,16 +743,16 @@ const FuneralAuditDashboard = () => {
                             className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mt-3"
                           >
                             <motion.div
-                              animate={{
-                                x: ["0%", "100%", "0%"],
-                              }}
-                              transition={{
-                                duration: 2,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                              className="h-2 w-1/3 rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-blue-500"
-                            />
+  animate={{
+    x: ["-100%", "400%"],
+  }}
+  transition={{
+    duration: 2,
+    repeat: Infinity,
+    ease: "linear",
+  }}
+  className="h-2 w-1/3 rounded-full bg-gradient-to-r from-blue-600 via-blue-400 to-blue-500"
+/>
                           </motion.div>
                         )}
 
@@ -1043,7 +1017,7 @@ const AddJobForm = ({ onSubmit, branches, setShowAddJob }) => {
             className="w-full px-4 py-3 border border-gray-300 rounded-xl 
                  focus:outline-none focus:ring-2 focus:ring-blue-500 
                  focus:border-transparent shadow-sm"
-            required
+            
           />
         </div>
 
