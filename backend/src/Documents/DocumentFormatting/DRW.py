@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from backend.src.Documents.Document import Document
+from src.Documents.Document import Document
 
 @dataclass
 class DeathRegistrationWorksheet(Document):

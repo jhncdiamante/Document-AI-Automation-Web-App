@@ -8,25 +8,26 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import timedelta
-import os
 import eventlet.wsgi
+import logging, os
+
 
 from flask import send_from_directory
-
-
 from flask_socketio import join_room
 
-from backend.src.Models import db
-from backend.src.Models import User, Upload, AuditResult
-from backend.src.Process.JobManager import Jobs
-from backend.src.Process.Worker import Worker
+from src.Models import db
+from src.Models import User, Upload, AuditResult
+from src.Process.JobManager import Jobs
+from src.Process.Worker import Worker
 
-from backend.src.Models import Job as JobModel
+from src.Models import Job as JobModel
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # parent of backend/
+db_path = os.path.join(BASE_DIR, "users.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///users.db"
 app.config['UPLOAD_FOLDER'] = 'userdata/uploads' 
 
 
@@ -76,6 +77,7 @@ with app.app_context():
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form.get('username')
@@ -164,7 +166,6 @@ def get_jobs():
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve(path):
-    # __file__ is application.py in root
     build_dir = os.path.join(os.path.dirname(__file__), "frontend", "build")
     if path != "" and os.path.exists(os.path.join(build_dir, path)):
         return send_from_directory(build_dir, path)
@@ -174,11 +175,9 @@ def serve(path):
 
 
 if __name__ == "__main__":
-    import logging, os
     logging.basicConfig(level=logging.INFO)  
-    port = int(os.environ.get("PORT", 5000))  # fallback to 5000 locally
         
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, use_reloader=False)
 
 
 

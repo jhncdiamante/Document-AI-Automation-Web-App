@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { io } from "socket.io-client";
 
-const BASE_URL = "http://52.87.168.6";
+const BASE_URL = "http://localhost:5000";
 const socket = io(BASE_URL, {
   withCredentials: true,
   transports: ["websocket"],
@@ -133,47 +133,41 @@ const FuneralAuditDashboard = () => {
   };
 
   useEffect(() => {
-    socket.on("new_job", (jobData) => {
-      console.log("New job received:", jobData);
-      setJobs((prevJobs) => [...prevJobs, jobData]);
-    });
-
-    socket.on("job_update", (updatedJob) => {
-      console.log("Job updated:", updatedJob);
-      setJobs((prevJobs) =>
-        prevJobs.map((job) =>
-          job.id === updatedJob.id ? { ...job, ...updatedJob } : job
-        )
+    if (!isLoggedIn) return; // only connect if logged in
+  
+    if (!socket.connected) socket.connect();
+  
+    const handleNewJob = (jobData) => setJobs((prev) => [...prev, jobData]);
+    const handleJobUpdate = (updatedJob) =>
+      setJobs((prev) =>
+        prev.map((job) => (job.id === updatedJob.id ? { ...job, ...updatedJob } : job))
       );
-    });
-
-    socket.on("job_progress", (update) => {
-      console.log("Job progress update:", update);
-      setJobs((prevJobs) =>
-        prevJobs.map((job) =>
-          job.id === update.id ? { ...job, status: update.status } : job
-        )
+    const handleJobProgress = (update) =>
+      setJobs((prev) =>
+        prev.map((job) => (job.id === update.id ? { ...job, status: update.status } : job))
       );
-    });
-
-    socket.on("job_failed", (failedJob) => {
-      console.error("Job failed:", failedJob);
-      setJobs((prevJobs) =>
-        prevJobs.map((job) =>
+    const handleJobFailed = (failedJob) =>
+      setJobs((prev) =>
+        prev.map((job) =>
           job.id === failedJob.id
             ? { ...job, status: "failed", error: failedJob.error || "Unknown error" }
             : job
         )
       );
-    });
-
+  
+    socket.on("new_job", handleNewJob);
+    socket.on("job_update", handleJobUpdate);
+    socket.on("job_progress", handleJobProgress);
+    socket.on("job_failed", handleJobFailed);
+  
     return () => {
-      socket.off("new_job");
-      socket.off("job_update");
-      socket.off("job_progress");
-      socket.off("job_failed");
+      socket.off("new_job", handleNewJob);
+      socket.off("job_update", handleJobUpdate);
+      socket.off("job_progress", handleJobProgress);
+      socket.off("job_failed", handleJobFailed);
     };
-  }, []);
+  }, [isLoggedIn]);
+  
 
   const [loading, setLoading] = useState(true);
 
@@ -198,7 +192,6 @@ const FuneralAuditDashboard = () => {
         setLoading(false);
       }
     };
-
     checkSession();
   }, []);
 
@@ -699,10 +692,10 @@ const FuneralAuditDashboard = () => {
                           >
                             <motion.div
                               animate={{
-                                x: ["0%", "100%", "0%"],
+                                x: ["-100%", "400%"],
                               }}
                               transition={{
-                                duration: 2,
+                                duration: 1,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}

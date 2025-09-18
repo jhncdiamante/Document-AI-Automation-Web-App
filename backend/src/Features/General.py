@@ -1,5 +1,5 @@
-from backend.src.Features.IFeature import AIFeature
-from backend.src.Configs import DOCUMENT_GENERAL_AUDIT_PROMPT
+from src.Features.IFeature import AIFeature
+from src.Configs import DOCUMENT_GENERAL_AUDIT_PROMPT
 
 
 class GeneralAudit(AIFeature):

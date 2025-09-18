@@ -6,7 +6,7 @@ import queue
 from flask import jsonify
 from flask_login import current_user
 
-from backend.src.Models import Job as JobModel, Upload, db
+from src.Models import Job as JobModel, Upload, db
 
 
 class Jobs:
@@ -66,6 +66,7 @@ class Jobs:
                 return jsonify({"error": f"Job {job_id} already {job_record.status}"}), 400
 
             job_record.status = "canceled"
+            db.session.add(job_record)
             db.session.commit()
 
             return jsonify({"success": f"Job {job_id} canceled successfully"})
@@ -73,7 +74,6 @@ class Jobs:
 
     def add(self, request):
         files = request.files.getlist("files")
-        saved_files = []
 
         with self.app.app_context():
             job_id = str(uuid.uuid4())
@@ -84,7 +84,7 @@ class Jobs:
             description = request.form.get("description", "")
             feature = request.form.get("feature", "")
 
-            if not all([branch, description, feature]):
+            if not branch or not feature:
                 return jsonify({"error": "Failed to add job, missing at least one attribute."}), 400
 
             job_record = JobModel(
@@ -96,8 +96,11 @@ class Jobs:
                 feature=feature,
                 user_id=current_user.id,
             )
+            print("Adding to database")
             db.session.add(job_record)
             db.session.commit()
+            print("Successfully added..")
+
 
             for file in files:
                 original_filename = secure_filename(file.filename)
@@ -106,7 +109,6 @@ class Jobs:
                     self.app.config["UPLOAD_FOLDER"], unique_filename
                 )
                 file.save(permanent_filepath)
-                saved_files.append(permanent_filepath)
 
                 upload_record = Upload(
                     permanent_file_name=original_filename,
@@ -117,9 +119,13 @@ class Jobs:
                 db.session.add(upload_record)
 
             db.session.commit()
+            print("Files Successfully added..")
+
 
             # enqueue DB job_id only
             self.queue.put(job_id)
+            print("Job added in queue..")
+
 
             self.socketio.emit(
                 "new_job",
@@ -136,7 +142,7 @@ class Jobs:
                 room=f"user_{job_record.user_id}",
             )
 
-            return jsonify({"success": "Successfully added job."}), 
+            return jsonify({"success": "Successfully added job."})
             
     def delete(self, job_id):
         with self.app.app_context():
@@ -149,9 +155,9 @@ class Jobs:
                     {"error": f"Job {job_id} is still {job_record.status}, cannot delete"}
                 ), 400
 
-            for upload in job_record.uploads:
+            '''for upload in job_record.uploads:
                 if upload.file_path and os.path.exists(upload.file_path):
-                    os.remove(upload.file_path)
+                    os.remove(upload.file_path)'''
 
 
             db.session.delete(job_record) 

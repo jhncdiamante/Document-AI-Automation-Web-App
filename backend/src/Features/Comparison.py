@@ -1,5 +1,5 @@
-from backend.src.Configs import DOCUMENT_COMPARISON_PROMPT
-from backend.src.Features.IFeature import AIFeature
+from src.Configs import DOCUMENT_COMPARISON_PROMPT
+from src.Features.IFeature import AIFeature
 
 class DocumentComparison(AIFeature):
     def compare(self, document1, document2):

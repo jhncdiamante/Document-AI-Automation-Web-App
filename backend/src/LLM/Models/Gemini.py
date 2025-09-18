@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from backend.src.LLM.Models.IModel import IModel
+from src.LLM.Models.IModel import IModel
 import json
 
 import re, json

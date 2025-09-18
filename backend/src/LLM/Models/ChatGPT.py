@@ -3,7 +3,7 @@ import re
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
-from backend.src.LLM.Models.IModel import IModel
+from src.LLM.Models.IModel import IModel
 
 
 class ChatGPTAI(IModel):

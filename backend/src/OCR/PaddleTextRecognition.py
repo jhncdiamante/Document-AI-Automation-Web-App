@@ -1,8 +1,8 @@
-from backend.src.Documents.Page import Page
-from backend.src.OCR.ITextRecognition import ITextRecognition
+from src.Documents.Page import Page
+from src.OCR.ITextRecognition import ITextRecognition
 from paddleocr import PaddleOCR
 
-from backend.src.OCR.ITextRecognition import ITextRecognition
+from src.OCR.ITextRecognition import ITextRecognition
 from paddleocr import PaddleOCR
 from numpy.typing import NDArray
 from typing_extensions import Tuple

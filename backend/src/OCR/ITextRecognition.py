@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from backend.src.Documents.Page import Page
+from src.Documents.Page import Page
 
 class ITextRecognition(ABC):
     @abstractmethod

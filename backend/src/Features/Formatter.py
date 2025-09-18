@@ -1,5 +1,5 @@
-from backend.src.Configs import DOCUMENT_FORMATTING_PROMPT
-from backend.src.Features.IFeature import AIFeature
+from src.Configs import DOCUMENT_FORMATTING_PROMPT
+from src.Features.IFeature import AIFeature
 
 class DocumentFormatter(AIFeature):
 

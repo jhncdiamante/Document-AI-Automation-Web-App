@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
-from backend.src.Documents.Page import Page
+from src.Documents.Page import Page
 
 
 def get_full_document_text(pages: list[Page]):

@@ -2,16 +2,16 @@ from pdf2image import convert_from_path
 import numpy as np
 from datetime import datetime
 
-from backend.src.Models import Job as JobModel, AuditResult, Upload, db
-from backend.src.Documents.Page import Page
-from backend.src.OCR.PaddleTextRecognition import PaddleOCRTextRecognition
-from backend.src.Features.Classification import DocumentClassification
-from backend.src.LLM.Models.ChatGPT import ChatGPTAI
-from backend.src.Documents.DocumentFormatting.DeathCertificate import DeathCertificate
-from backend.src.Documents.DocumentFormatting.DRW import DeathRegistrationWorksheet
-from backend.src.Features.Formatter import DocumentFormatter
-from backend.src.Features.Comparison import DocumentComparison
-from backend.src.Features.General import GeneralAudit
+from src.Models import Job as JobModel, AuditResult, Upload, db
+from src.Documents.Page import Page
+from src.OCR.PaddleTextRecognition import PaddleOCRTextRecognition
+from src.Features.Classification import DocumentClassification
+from src.LLM.Models.ChatGPT import ChatGPTAI
+from src.Documents.DocumentFormatting.DeathCertificate import DeathCertificate
+from src.Documents.DocumentFormatting.DRW import DeathRegistrationWorksheet
+from src.Features.Formatter import DocumentFormatter
+from src.Features.Comparison import DocumentComparison
+from src.Features.General import GeneralAudit
 
 
 class Worker:
@@ -61,12 +61,18 @@ class Worker:
         Takes a JobModel record directly from DB.
         Fetches related uploads for processing.
         """
+        job_record.status = "processing"
+        db.session.add(job_record)
+        db.session.commit()
         # tell frontend job started
         self._emit_to_frontend("job_progress", {
             "id": job_record.id,
             "status": "processing",
+            "user_id": job_record.user_id
         })
 
+        print("Processing job")
+        
         try:
             uploaded_files = [u.file_path for u in job_record.uploads]
             documents = self._standardize_document(uploaded_files)
@@ -92,6 +98,8 @@ class Worker:
                 accuracy=feature_results.get("accuracy"),
                 issues=feature_results.get("issues"),
             )
+            db.session.add(job_record)  
+
             db.session.add(audit)
             db.session.commit()
 
@@ -100,8 +108,12 @@ class Worker:
                 "status": "completed",
                 "accuracy": audit.accuracy,
                 "issues": audit.issues,
-                "completed_at": audit.completed_at.isoformat()
+                "completed_at": audit.completed_at.isoformat(),
+                "user_id": job_record.user_id
+
             }
+            self._emit_to_frontend("job_update", result)
+
 
         except Exception as e:
             db.session.rollback()
@@ -115,17 +127,16 @@ class Worker:
             db.session.add(audit)
             db.session.commit()
 
+
             result = {
                 "id": job_record.id,
                 "status": job_record.status,
                 "error": job_record.error,
-                "completed_at": audit.completed_at.isoformat()
+                "completed_at": audit.completed_at.isoformat(),
+                "user_id": job_record.user_id
             }
             self._emit_to_frontend("job_failed", result)
-            return result
 
-        self._emit_to_frontend("job_update", result)
-        return result
 
     def _emit_to_frontend(self, name: str, data: dict, namespace="/"):
         """Send socketio events only to the owning user"""
