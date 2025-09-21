@@ -562,7 +562,7 @@ const FuneralAuditDashboard = () => {
                             leaveTo="transform opacity-0 scale-95"
                           >
                             <Menu.Items className="absolute right-0 mt-2 w-32 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
-                              {job.status === "completed" || job.status === "stopped" ? (
+                              {job.status === "completed" || job.status === "stopped" || job.status === "failed" || job.status === "canceled" ? (
                                 <Menu.Item>
                                   {({ active }) => (
                                     <motion.button

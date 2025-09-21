@@ -17,6 +17,8 @@ DOCUMENT_COMPARISON_PROMPT = (
     "6. Abbreviations and expansions:\n"
     "   - Common forms should be treated as equal (e.g., 'St.' vs 'Street').\n"
     "7. Report an issue only if values truly differ in meaning.\n\n"
+    "8. Do not implement exact string matching."
+    "9. ONLY return valid and accurate issues. The fields that DO NOT match only, nothing else. "
 
     "Output Format:\n"
     "{\n"

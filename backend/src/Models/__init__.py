@@ -33,7 +33,7 @@ class Job(db.Model):
     id = db.Column(db.String, primary_key=True)  # UUID or custom ID
     case_number = db.Column(db.String, nullable=False)
     branch = db.Column(db.String, nullable=False)
-    description = db.Column(db.String, nullable=False)
+    description = db.Column(db.String, nullable=True)
     status = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     feature = db.Column(db.String, nullable=False)
