@@ -1,143 +1,64 @@
 import os
 import uuid
-import eventlet
-eventlet.monkey_patch()
-
+import traceback
 from flask import jsonify
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
+from rq import Queue
+
 from src.Models import Job as JobModel, Upload, db
 
+from src.Process.Worker import Worker
+worker = Worker()
+
+def process_job(job_id):
+    """
+    Global RQ-compatible function.
+    """
+    print("Starting the process_job function")
+    worker.process_job(job_id)
+
 class Jobs:
-    def __init__(self, app, worker, socketio, worker_count=2):
+    def __init__(self, app, socketio, queue: Queue = None):
         self.app = app
-        self.worker = worker
         self.socketio = socketio
-        self.queue = eventlet.queue.LightQueue()
-        
+        self.queue = queue
+
+        # SQLAlchemy session factory
         with app.app_context():
             self.SessionLocal = sessionmaker(bind=db.engine)
 
-        # Spawn lightweight worker greenlets
-        for i in range(worker_count):
-            eventlet.spawn(self._worker_loop, f"worker-{i}")
-
     @contextmanager
     def get_db_session(self):
-        """Context manager for database sessions"""
         session = self.SessionLocal()
         try:
             yield session
             session.commit()
-        except Exception:
+        except:
             session.rollback()
             raise
         finally:
             session.close()
 
-    def _worker_loop(self, worker_name):
-        """
-        Ultra-lightweight worker loop that just dispatches to the thread pool
-        """
-        print(f"[JobManager] {worker_name} started")
-        
-        while True:
-            try:
-                # Get job ID from queue (this blocks but doesn't block other greenlets)
-                job_id = self.queue.get()
-                print(f"[JobManager] {worker_name} picked up job {job_id}")
-                
-                # Immediately dispatch to worker thread pool (non-blocking)
-                eventlet.spawn_n(self._dispatch_job, job_id, worker_name)
-                
-                # Small yield to let other greenlets run
-                eventlet.sleep(0.01)
-                
-            except Exception as e:
-                print(f"[JobManager] {worker_name} error: {e}")
-                eventlet.sleep(1)  # Wait before retrying
-
-    def _dispatch_job(self, job_id, worker_name):
-        """
-        Lightweight job dispatcher - just gets job record and hands off to worker
-        """
-        try:
-            with self.app.app_context():
-                with self.get_db_session() as session:
-                    job_record = session.get(JobModel, job_id)
-                    
-                    if not job_record:
-                        print(f"[JobManager] {worker_name}: Job {job_id} not found")
-                        return
-                        
-                    if job_record.status != "queued":
-                        print(f"[JobManager] {worker_name}: Job {job_id} status is {job_record.status}, skipping")
-                        return
-                    
-                    print(f"[JobManager] {worker_name}: Dispatching job {job_id} to worker thread pool")
-                    
-                    # Hand off to worker thread pool (completely non-blocking)
-                    self.worker.process_job(job_record)
-                    
-        except Exception as e:
-            print(f"[JobManager] {worker_name}: Error dispatching job {job_id}: {e}")
-            
-            # Try to mark job as failed
-            try:
-                with self.app.app_context():
-                    with self.get_db_session() as session:
-                        job = session.get(JobModel, job_id)
-                        if job:
-                            job.status = "failed"
-                            job.error = f"Dispatch error: {str(e)}"
-                            session.commit()
-                            
-                            # Emit failure
-                            eventlet.spawn_n(self._emit_job_failed, job.id, job.user_id, str(e))
-            except Exception as cleanup_error:
-                print(f"[JobManager] {worker_name}: Error during cleanup: {cleanup_error}")
-
-    def _emit_job_failed(self, job_id, user_id, error_msg):
-        """Emit job failure in a separate greenlet"""
-        try:
-            self.socketio.emit(
-                "job_failed",
-                {
-                    "id": job_id,
-                    "status": "failed",
-                    "error": error_msg,
-                    "user_id": user_id
-                },
-                room=f"user_{user_id}"
-            )
-        except Exception as e:
-            print(f"[JobManager] Error emitting job failure: {e}")
-
     def add(self, request):
-        """
-        Add a new job - keep this as lightweight as possible
-        """
+        """Add a new job and enqueue it in Redis"""
         try:
             files = request.files.getlist("files")
-            
-            # Validate required fields immediately
             branch = request.form.get("branch", "").strip()
             feature = request.form.get("feature", "").strip()
-            
+
             if not branch or not feature:
                 return jsonify({"error": "Missing branch or feature"}), 400
-
-            # Quick file validation
             if not files or not any(f.filename for f in files):
                 return jsonify({"error": "No files provided"}), 400
 
             job_id = str(uuid.uuid4())
-            
+            uploaded_files = []
+
             with self.app.app_context():
                 with self.get_db_session() as session:
-                    # Create job record
                     job_record = JobModel(
                         id=job_id,
                         case_number=request.form.get("case_number", "").strip(),
@@ -148,20 +69,15 @@ class Jobs:
                         description=request.form.get("description", "").strip()
                     )
                     session.add(job_record)
-                    session.flush()  # Get the created_at timestamp
+                    session.flush()
                     created_at = job_record.created_at
 
-                    # Handle file uploads
-                    uploaded_files = []
+                    # Save uploaded files
                     for file in files:
                         if file.filename:
                             unique_filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
                             filepath = os.path.join(self.app.config["UPLOAD_FOLDER"], unique_filename)
-                            filepath = os.path.normpath(filepath)
-                            
-                            # Save file
-                            file.save(filepath)
-                            
+                            file.save(os.path.normpath(filepath))
                             upload_record = Upload(
                                 permanent_file_name=file.filename,
                                 file_path=filepath,
@@ -170,15 +86,13 @@ class Jobs:
                             )
                             session.add(upload_record)
                             uploaded_files.append(file.filename)
-
                     session.commit()
 
-            # Add to queue for processing
-            self.queue.put(job_id)
-            print(f"[JobManager] Job {job_id} queued successfully")
+            # Enqueue job into Redis Queue
+            self.queue.enqueue(process_job, job_id, job_timeout=4000)
+            print(f"[JobManager] Job {job_id} enqueued successfully in Redis")
 
-            # Emit to frontend (non-blocking)
-            eventlet.spawn_n(self._emit_new_job, {
+            job_data = {
                 "id": job_id,
                 "status": "queued",
                 "files": uploaded_files,
@@ -187,109 +101,102 @@ class Jobs:
                 "branch": branch,
                 "feature": feature,
                 "user_id": current_user.id
-            })
-
-            return jsonify({
-                "success": "Job added successfully",
-                "job_id": job_id
-            }), 200
+            }
+            self._emit_new_job(job_data)
+            return jsonify({"success": "Job added successfully", "job_id": job_id}), 200
 
         except Exception as e:
             print(f"[JobManager] Error adding job: {e}")
+            traceback.print_exc()
             return jsonify({"error": f"Failed to add job: {str(e)}"}), 500
 
-    def _emit_new_job(self, job_data):
-        """Emit new job event in separate greenlet"""
-        try:
-            self.socketio.emit(
-                "new_job",
-                job_data,
-                room=f"user_{job_data['user_id']}"
-            )
-        except Exception as e:
-            print(f"[JobManager] Error emitting new job: {e}")
-
     def stop(self, job_id: str):
-        """Cancel a job - keep lightweight"""
+        """Mark job as canceled in DB (Redis worker will respect this)"""
         try:
             with self.app.app_context():
                 with self.get_db_session() as session:
-                    job_record = session.get(JobModel, job_id)
-                    
-                    if not job_record:
+                    job = session.get(JobModel, job_id)
+                    if not job:
                         return jsonify({"error": f"Job {job_id} not found."}), 400
-                        
-                    if job_record.status not in {"queued", "processing"}:
-                        return jsonify({
-                            "error": f"Job {job_id} is {job_record.status}, cannot cancel"
-                        }), 400
-                    
-                    job_record.status = "canceled"
+                    if job.status not in {"queued", "processing"}:
+                        return jsonify({"error": f"Job {job_id} is {job.status}, cannot cancel"}), 400
+                    job.status = "canceled"
                     session.commit()
-                    
-                    # Emit cancellation (non-blocking)
-                    eventlet.spawn_n(self._emit_job_update, {
-                        "id": job_id,
-                        "status": "canceled",
-                        "user_id": job_record.user_id
-                    })
-                    
+                    self._emit_job_update({"id": job_id, "status": "canceled", "user_id": job.user_id})
                     return jsonify({"success": f"Job {job_id} canceled successfully"})
-                    
         except Exception as e:
-            print(f"[JobManager] Error canceling job {job_id}: {e}")
             return jsonify({"error": f"Failed to cancel job: {str(e)}"}), 500
 
-    def _emit_job_update(self, update_data):
-        """Emit job update in separate greenlet"""
-        try:
-            self.socketio.emit(
-                "job_update",
-                update_data,
-                room=f"user_{update_data['user_id']}"
-            )
-        except Exception as e:
-            print(f"[JobManager] Error emitting job update: {e}")
-
-    def delete(self, job_id):
-        """Delete a completed/failed job"""
+    def delete(self, job_id: str):
+        """Delete a completed/failed/canceled job"""
         try:
             with self.app.app_context():
                 with self.get_db_session() as session:
-                    job_record = session.get(JobModel, job_id)
-                    
-                    if not job_record:
+                    job = session.get(JobModel, job_id)
+                    if not job:
                         return jsonify({"error": f"Job {job_id} not found."}), 400
-                        
-                    if job_record.status not in {"completed", "canceled", "failed"}:
-                        return jsonify({
-                            "error": f"Job {job_id} is still {job_record.status}, cannot delete"
-                        }), 400
-                    
-                    # Delete associated files (in background)
-                    file_paths = [upload.file_path for upload in job_record.uploads]
-                    eventlet.spawn_n(self._cleanup_files, file_paths)
-                    
-                    session.delete(job_record)
+                    if job.status not in {"completed", "failed", "canceled"}:
+                        return jsonify({"error": f"Job {job_id} is still {job.status}, cannot delete"}), 400
+                    file_paths = [u.file_path for u in job.uploads]
+                    for fp in file_paths:
+                        try:
+                            os.remove(fp)
+                        except:
+                            pass
+                    session.delete(job)
                     session.commit()
-                    
                     return jsonify({"success": f"Job {job_id} deleted successfully"})
-                    
         except Exception as e:
-            print(f"[JobManager] Error deleting job {job_id}: {e}")
             return jsonify({"error": f"Failed to delete job: {str(e)}"}), 500
 
-    def _cleanup_files(self, file_paths):
-        """Clean up files in background"""
-        for filepath in file_paths:
-            try:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                    print(f"[JobManager] Deleted file: {filepath}")
-            except Exception as e:
-                print(f"[JobManager] Warning: Could not delete file {filepath}: {e}")
+    # --- SocketIO helpers ---
+    def _emit_new_job(self, job_data):
+        try:
+            room = f"user_{job_data['user_id']}"
+            self.socketio.emit("new_job", job_data, room=room)
+        except Exception as e:
+            print(f"[JobManager] Error emitting new_job: {e}")
 
-    def shutdown(self):
-        """Shutdown the job manager"""
-        print("[JobManager] Shutting down...")
-        self.worker.shutdown()
+    def _emit_job_update(self, update_data):
+        try:
+            room = f"user_{update_data['user_id']}"
+            self.socketio.emit("job_update", update_data, room=room)
+        except Exception as e:
+            print(f"[JobManager] Error emitting job_update: {e}")
+
+    def _emit_job_failed(self, job_id, user_id, error_msg):
+        try:
+            room = f"user_{user_id}"
+            self.socketio.emit(
+                "job_failed",
+                {"id": job_id, "status": "failed", "error": error_msg, "user_id": user_id},
+                room=room
+            )
+        except Exception as e:
+            print(f"[JobManager] Error emitting job_failed: {e}")
+
+    def get_all(self, user_id):
+        """Fetch all jobs for a user"""
+        try:
+            with self.app.app_context():
+                with self.get_db_session() as session:
+                    jobs_list = session.query(JobModel).filter_by(user_id=user_id).all()
+                    return jsonify([
+                        {
+                            "id": j.id,
+                            "case_number": j.case_number,
+                            "branch": j.branch,
+                            "status": j.status,
+                            "created_at": j.created_at.isoformat(),
+                            "files": [{"permanent_file_name": u.permanent_file_name} for u in j.uploads],
+                            "feature": j.feature,
+                            "description": j.description,
+                            "completed_at": j.audit_result.completed_at.isoformat() if j.audit_result and j.audit_result.completed_at else None,
+                            "accuracy": j.audit_result.accuracy if j.audit_result else None,
+                            "issues": j.audit_result.issues if j.audit_result else [],
+                            "error": j.error if hasattr(j, 'error') and j.error else (j.audit_result.error if j.audit_result and hasattr(j.audit_result, 'error') else None)
+                        } for j in jobs_list
+                    ])
+        except Exception as e:
+            print(f"[JobManager] Error fetching jobs: {e}")
+            return jsonify({"error": "Failed to fetch jobs"}), 500
