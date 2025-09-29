@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.dialects.sqlite import JSON  # for issues list
 from flask_login import UserMixin
 from sqlalchemy import event
@@ -35,7 +35,10 @@ class Job(db.Model):
     branch = db.Column(db.String, nullable=False)
     description = db.Column(db.String, nullable=True)
     status = db.Column(db.String, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+    db.DateTime(timezone=True),
+    default=lambda: datetime.now(timezone.utc)
+)
     feature = db.Column(db.String, nullable=False)
     
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -53,7 +56,10 @@ class AuditResult(db.Model):
     
     accuracy = db.Column(db.String, nullable=True)   
     issues = db.Column(JSON, nullable=True)         
-    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(
+    db.DateTime(timezone=True),
+    default=lambda: datetime.now(timezone.utc)
+)
     error = db.Column(db.Text, nullable=True)
 
 

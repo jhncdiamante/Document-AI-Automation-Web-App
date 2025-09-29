@@ -13,6 +13,7 @@ from src.Documents.DocumentFormatting.DRW import DeathRegistrationWorksheet
 from src.Features.Formatter import DocumentFormatter
 from src.Features.Comparison import DocumentComparison
 from src.Features.General import GeneralAudit
+from src.Helpers.date_formats import to_utc_iso
 
 from src.flask_config import app
 from src.Socket import socketio
@@ -50,12 +51,13 @@ class Worker:
     def _standardize_document(self, uploaded_files):
         documents = []
         print(f"Standardizing documents...")
-        for file in uploaded_files[:1]:
+        for file in uploaded_files:
             pages = self._convert_pdf_pages_to_images(file)
             pages_read = []
             for page in pages:
                 image_np = np.array(page)
                 recognized_texts = self.ocr.get_recognized_texts(image_np)
+                
                 pages_read.append(Page(content=recognized_texts))
 
             doc_type = (self.classifier.classify(pages_read) or "").strip().lower()
@@ -115,7 +117,7 @@ class Worker:
                             "status": "completed",
                             "accuracy": audit.accuracy,
                             "issues": audit.issues,
-                            "completed_at": audit.completed_at.isoformat(),
+                            "completed_at": to_utc_iso(audit.completed_at),
                             "user_id": job_db.user_id
                         })
 
@@ -134,7 +136,7 @@ class Worker:
                             "id": job_db.id,
                             "status": "failed",
                             "error": job_db.error,
-                            "completed_at": audit.completed_at.isoformat(),
+                            "completed_at": to_utc_iso(audit.completed_at),
                             "user_id": job_db.user_id
                         })
 

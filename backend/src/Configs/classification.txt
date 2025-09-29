@@ -1,0 +1,14 @@
+# Instructions
+
+* Given the raw text, determine the document type with maximum accuracy.
+
+* Valid choices are exactly:
+
+- "death registration worksheet"
+
+- "certificate of death"
+
+
+* Return only the exact string of the chosen document type.
+
+* Do not include explanations, reasoning, or any additional text.

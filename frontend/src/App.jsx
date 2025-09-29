@@ -63,7 +63,10 @@ const getStatusIcon = (status) => {
   }
 };
 
+const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 const FuneralAuditDashboard = () => {
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [showAddJob, setShowAddJob] = useState(false);
@@ -267,9 +270,11 @@ const FuneralAuditDashboard = () => {
         className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center"
       >
         <motion.div
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full"
-        />
+  animate={{ rotate: 360 }}
+  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+  className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full"
+/>
+
       </motion.div>
     );
   }
@@ -719,6 +724,7 @@ const FuneralAuditDashboard = () => {
                               hour: "2-digit",
                               minute: "2-digit",
                               hour12: true,
+                              timeZone: userTimeZone,
                             })}
                           </p>
                           {job.completed_at && (
@@ -731,6 +737,7 @@ const FuneralAuditDashboard = () => {
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 hour12: true,
+                                timeZone: userTimeZone,
                               })}
                             </p>
                           )}
@@ -1257,13 +1264,15 @@ const JobDetails = ({ job }) => {
           <div>
             <span className="text-gray-500">Created:</span>
             <span className="ml-2 font-medium text-gray-900">
+              
             {new Date(job.created_at).toLocaleString(undefined, {
               month: "2-digit",
               day: "2-digit",
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
-              hour12: true
+              hour12: true,
+              timeZone: userTimeZone,
             })}
             </span>
           </div>
@@ -1300,7 +1309,8 @@ const JobDetails = ({ job }) => {
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
-              hour12: true
+              hour12: true,
+              timeZone: userTimeZone,
             })}
               </span>
             </div>

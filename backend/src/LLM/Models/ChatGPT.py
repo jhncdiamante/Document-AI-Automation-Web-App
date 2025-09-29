@@ -47,4 +47,4 @@ class ChatGPTAI(IModel):
             return json.loads(self.get_text_response())
         except json.JSONDecodeError:
             print("ChatGPT returned non-JSON text, wrapping into fallback:")
-            return {"raw_text": raw_text}
+            return {"raw_text": ""}

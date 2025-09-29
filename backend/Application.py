@@ -15,7 +15,6 @@ from src.Socket import socketio
 import queue
 from src.Models import db, User
 
-from src.Redis import task_queue
 
 CORS(app, supports_credentials=True)
 
@@ -56,7 +55,7 @@ print("Initializing jobs..")
 from src.Process.JobManager import Jobs
 
 # --- Initialize Worker and Jobs ---
-jobs = Jobs(app, socketio, queue=task_queue)
+jobs = Jobs(app, socketio)
 
 # --- App context ---
 with app.app_context():

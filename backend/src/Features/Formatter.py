@@ -5,6 +5,6 @@ class DocumentFormatter(AIFeature):
 
     def format_document(self, document):
         self._ai_model.set_prompt(f"{DOCUMENT_FORMATTING_PROMPT}\n"
-                                  f"Document fields: {document.fields}\n\n"
-                                  f"Document Text Content: {document.full_document_text}")
-        document.parsed_content = self._ai_model.get_text_response()
+                                  f"Document standard fields: {document.fields}\n\n"
+                                  f"Document Raw Text Content with Recognition Boxes: {document.full_document_text}")
+        document.parsed_content = self._ai_model.get_json_response()

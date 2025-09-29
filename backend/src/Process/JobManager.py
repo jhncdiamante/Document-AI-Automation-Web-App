@@ -6,11 +6,20 @@ from flask_login import current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
-from rq import Queue
 
 from src.Models import Job as JobModel, Upload, db
 
 from src.Process.Worker import Worker
+
+
+import threading
+
+import queue
+
+
+from src.Helpers.date_formats import to_utc_iso
+
+
 worker = Worker()
 
 def process_job(job_id):
@@ -21,7 +30,7 @@ def process_job(job_id):
     worker.process_job(job_id)
 
 class Jobs:
-    def __init__(self, app, socketio, queue: Queue = None):
+    def __init__(self, app, socketio, queue=queue.Queue()):
         self.app = app
         self.socketio = socketio
         self.queue = queue
@@ -29,6 +38,23 @@ class Jobs:
         # SQLAlchemy session factory
         with app.app_context():
             self.SessionLocal = sessionmaker(bind=db.engine)
+
+        threading.Thread(target=self._worker_loop, daemon=True).start()
+
+
+    def _worker_loop(self):
+        while True:
+            job_id, callback = self.queue.get()
+            try:
+                print(f"[WorkerLoop] Processing job {job_id}")
+                callback(job_id)
+            except Exception as e:
+                print(f"[WorkerLoop] Job {job_id} failed: {e}")
+                traceback.print_exc()
+            finally:
+                self.queue.task_done()
+
+    # Start worker thread
 
     @contextmanager
     def get_db_session(self):
@@ -89,14 +115,14 @@ class Jobs:
                     session.commit()
 
             # Enqueue job into Redis Queue
-            self.queue.enqueue(process_job, job_id, job_timeout=4000)
+            self.queue.put((job_id, process_job))
             print(f"[JobManager] Job {job_id} enqueued successfully in Redis")
 
             job_data = {
                 "id": job_id,
                 "status": "queued",
                 "files": uploaded_files,
-                "created_at": created_at.isoformat(),
+                "created_at": to_utc_iso(created_at),
                 "case_number": request.form.get("case_number", ""),
                 "branch": branch,
                 "feature": feature,
@@ -187,11 +213,11 @@ class Jobs:
                             "case_number": j.case_number,
                             "branch": j.branch,
                             "status": j.status,
-                            "created_at": j.created_at.isoformat(),
+                            "created_at": to_utc_iso(j.created_at),
                             "files": [{"permanent_file_name": u.permanent_file_name} for u in j.uploads],
                             "feature": j.feature,
                             "description": j.description,
-                            "completed_at": j.audit_result.completed_at.isoformat() if j.audit_result and j.audit_result.completed_at else None,
+                            "completed_at": to_utc_iso(j.audit_result.completed_at) if j.audit_result else None,
                             "accuracy": j.audit_result.accuracy if j.audit_result else None,
                             "issues": j.audit_result.issues if j.audit_result else [],
                             "error": j.error if hasattr(j, 'error') and j.error else (j.audit_result.error if j.audit_result and hasattr(j.audit_result, 'error') else None)
@@ -200,3 +226,5 @@ class Jobs:
         except Exception as e:
             print(f"[JobManager] Error fetching jobs: {e}")
             return jsonify({"error": "Failed to fetch jobs"}), 500
+
+

@@ -19,7 +19,7 @@ class PaddleOCRTextRecognition(ITextRecognition):
     def get_recognized_texts(self, page: NDArray) -> list[Tuple]:
         result = self._model.predict(page)
         if result:
-            return list(zip(result[0]["rec_texts"], result[0]["rec_scores"]))
+            return list(zip(result[0]["rec_texts"], result[0]["rec_boxes"], result[0]["rec_scores"]))
         raise ValueError("No recognized texts generated.")
 
     

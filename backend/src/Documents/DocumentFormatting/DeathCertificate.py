@@ -5,12 +5,15 @@ from src.Documents.Document import Document
 class DeathCertificate(Document):
     name: str = "Certificate of Death"
     fields: list[str] = field(default_factory=lambda: [
-        "DECEDENT'S LEGAL NAME (FIRST, MIDDLE, LAST, SUFFIX)",
-        "AKA'S (IF ANY)",
-        "DATE OF DEATH",
+        "DECEDENT'S FIRST NAME",
+        "DECEDENT'S MIDDLE NAME",
+        "DECEDENT'S LAST NAME",
+        "DECEDENT'S SUFFIX",
+        "DECEDENT's AKA'S",
+        "DATE OF DEATH (mm/dd/yyyy)",
         "SEX",
         "SOCIAL SECURITY NUMBER",
-        "DATE OF BIRTH",
+        "DATE OF BIRTH (mm/dd/yyyy)",
         "AGE",
         "CITY / TOWN / COUNTY / ZIP OF DEATH LOCATION",
         "PLACE OF DEATH (FACILITY NAME AND ADDRESS)",
@@ -49,10 +52,10 @@ class DeathCertificate(Document):
         "AUTOPSY PERFORMED?",
         "AUTOPSY FINDINGS AVAILABLE?",
         "NAME OF PERSON COMPLETING CAUSE OF DEATH",
-        "DATE CERTIFIED",
+        "DATE CERTIFIED (mm/dd/yyyy)",
         "CERTIFIER'S ADDRESS",
-        "DATE REGISTERED",
-        "DATE ISSUED",
+        "DATE REGISTERED (mm/dd/yyyy)",
+        "DATE ISSUED (mm/dd/yyyy)",
     ])
 
     def __str__(self):
