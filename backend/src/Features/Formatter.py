@@ -1,4 +1,4 @@
-from src.Configs import DOCUMENT_FORMATTING_PROMPT
+from src.Prompts import DOCUMENT_FORMATTING_PROMPT
 from src.Features.IFeature import AIFeature
 
 

@@ -1,5 +1,5 @@
 from src.Documents.Page import Page
-from src.Configs import DOCUMENT_CLASSIFICATION_PROMPT
+from src.Prompts import DOCUMENT_CLASSIFICATION_PROMPT
 from src.Documents.Document import get_full_document_text
 from src.Features.IFeature import AIFeature
 
