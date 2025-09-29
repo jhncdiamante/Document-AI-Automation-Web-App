@@ -9,6 +9,7 @@ def get_full_document_text(pages: list[Page]):
         document_text += f"{page.text_with_location_content}, "
     return document_text
 
+
 @dataclass
 class Document(ABC):
     pages: list[Page] = None
@@ -29,5 +30,3 @@ class Document(ABC):
     @property
     def full_document_text(self) -> str:
         return get_full_document_text(self.pages)
-
-        

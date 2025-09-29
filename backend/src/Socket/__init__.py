@@ -7,5 +7,5 @@ socketio = SocketIO(
     async_mode="threading",
     manage_session=False,
     logger=False,
-    engineio_logger=False
+    engineio_logger=False,
 )

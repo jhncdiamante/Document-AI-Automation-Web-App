@@ -11,7 +11,6 @@ from src.Models import Job as JobModel, Upload, db
 
 from src.Process.Worker import Worker
 
-
 import threading
 
 import queue
@@ -22,12 +21,6 @@ from src.Helpers.date_formats import to_utc_iso
 
 worker = Worker()
 
-def process_job(job_id):
-    """
-    Global RQ-compatible function.
-    """
-    print("Starting the process_job function")
-    worker.process_job(job_id)
 
 class Jobs:
     def __init__(self, app, socketio, queue=queue.Queue()):
@@ -40,7 +33,6 @@ class Jobs:
             self.SessionLocal = sessionmaker(bind=db.engine)
 
         threading.Thread(target=self._worker_loop, daemon=True).start()
-
 
     def _worker_loop(self):
         while True:
@@ -92,7 +84,7 @@ class Jobs:
                         status="queued",
                         feature=feature,
                         user_id=current_user.id,
-                        description=request.form.get("description", "").strip()
+                        description=request.form.get("description", "").strip(),
                     )
                     session.add(job_record)
                     session.flush()
@@ -101,22 +93,25 @@ class Jobs:
                     # Save uploaded files
                     for file in files:
                         if file.filename:
-                            unique_filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
-                            filepath = os.path.join(self.app.config["UPLOAD_FOLDER"], unique_filename)
+                            unique_filename = (
+                                f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
+                            )
+                            filepath = os.path.join(
+                                self.app.config["UPLOAD_FOLDER"], unique_filename
+                            )
                             file.save(os.path.normpath(filepath))
                             upload_record = Upload(
                                 permanent_file_name=file.filename,
                                 file_path=filepath,
                                 job_id=job_id,
-                                user_id=current_user.id
+                                user_id=current_user.id,
                             )
                             session.add(upload_record)
                             uploaded_files.append(file.filename)
                     session.commit()
 
-            # Enqueue job into Redis Queue
-            self.queue.put((job_id, process_job))
-            print(f"[JobManager] Job {job_id} enqueued successfully in Redis")
+            self.queue.put((job_id, worker.process_job))
+            print(f"[JobManager] Job {job_id} enqueued successfully.")
 
             job_data = {
                 "id": job_id,
@@ -126,7 +121,7 @@ class Jobs:
                 "case_number": request.form.get("case_number", ""),
                 "branch": branch,
                 "feature": feature,
-                "user_id": current_user.id
+                "user_id": current_user.id,
             }
             self._emit_new_job(job_data)
             return jsonify({"success": "Job added successfully", "job_id": job_id}), 200
@@ -145,10 +140,19 @@ class Jobs:
                     if not job:
                         return jsonify({"error": f"Job {job_id} not found."}), 400
                     if job.status not in {"queued", "processing"}:
-                        return jsonify({"error": f"Job {job_id} is {job.status}, cannot cancel"}), 400
+                        return (
+                            jsonify(
+                                {
+                                    "error": f"Job {job_id} is {job.status}, cannot cancel"
+                                }
+                            ),
+                            400,
+                        )
                     job.status = "canceled"
                     session.commit()
-                    self._emit_job_update({"id": job_id, "status": "canceled", "user_id": job.user_id})
+                    self._emit_job_update(
+                        {"id": job_id, "status": "canceled", "user_id": job.user_id}
+                    )
                     return jsonify({"success": f"Job {job_id} canceled successfully"})
         except Exception as e:
             return jsonify({"error": f"Failed to cancel job: {str(e)}"}), 500
@@ -162,7 +166,14 @@ class Jobs:
                     if not job:
                         return jsonify({"error": f"Job {job_id} not found."}), 400
                     if job.status not in {"completed", "failed", "canceled"}:
-                        return jsonify({"error": f"Job {job_id} is still {job.status}, cannot delete"}), 400
+                        return (
+                            jsonify(
+                                {
+                                    "error": f"Job {job_id} is still {job.status}, cannot delete"
+                                }
+                            ),
+                            400,
+                        )
                     file_paths = [u.file_path for u in job.uploads]
                     for fp in file_paths:
                         try:
@@ -195,8 +206,13 @@ class Jobs:
             room = f"user_{user_id}"
             self.socketio.emit(
                 "job_failed",
-                {"id": job_id, "status": "failed", "error": error_msg, "user_id": user_id},
-                room=room
+                {
+                    "id": job_id,
+                    "status": "failed",
+                    "error": error_msg,
+                    "user_id": user_id,
+                },
+                room=room,
             )
         except Exception as e:
             print(f"[JobManager] Error emitting job_failed: {e}")
@@ -207,24 +223,45 @@ class Jobs:
             with self.app.app_context():
                 with self.get_db_session() as session:
                     jobs_list = session.query(JobModel).filter_by(user_id=user_id).all()
-                    return jsonify([
-                        {
-                            "id": j.id,
-                            "case_number": j.case_number,
-                            "branch": j.branch,
-                            "status": j.status,
-                            "created_at": to_utc_iso(j.created_at),
-                            "files": [{"permanent_file_name": u.permanent_file_name} for u in j.uploads],
-                            "feature": j.feature,
-                            "description": j.description,
-                            "completed_at": to_utc_iso(j.audit_result.completed_at) if j.audit_result else None,
-                            "accuracy": j.audit_result.accuracy if j.audit_result else None,
-                            "issues": j.audit_result.issues if j.audit_result else [],
-                            "error": j.error if hasattr(j, 'error') and j.error else (j.audit_result.error if j.audit_result and hasattr(j.audit_result, 'error') else None)
-                        } for j in jobs_list
-                    ])
+                    return jsonify(
+                        [
+                            {
+                                "id": j.id,
+                                "case_number": j.case_number,
+                                "branch": j.branch,
+                                "status": j.status,
+                                "created_at": to_utc_iso(j.created_at),
+                                "files": [
+                                    {"permanent_file_name": u.permanent_file_name}
+                                    for u in j.uploads
+                                ],
+                                "feature": j.feature,
+                                "description": j.description,
+                                "completed_at": (
+                                    to_utc_iso(j.audit_result.completed_at)
+                                    if j.audit_result
+                                    else None
+                                ),
+                                "accuracy": (
+                                    j.audit_result.accuracy if j.audit_result else None
+                                ),
+                                "issues": (
+                                    j.audit_result.issues if j.audit_result else []
+                                ),
+                                "error": (
+                                    j.error
+                                    if hasattr(j, "error") and j.error
+                                    else (
+                                        j.audit_result.error
+                                        if j.audit_result
+                                        and hasattr(j.audit_result, "error")
+                                        else None
+                                    )
+                                ),
+                            }
+                            for j in jobs_list
+                        ]
+                    )
         except Exception as e:
             print(f"[JobManager] Error fetching jobs: {e}")
             return jsonify({"error": "Failed to fetch jobs"}), 500
-
-

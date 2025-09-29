@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class Page:
     content: list[tuple]
@@ -15,4 +16,3 @@ class Page:
     @property
     def text_with_location_content(self) -> str:
         return ", ".join([f"{text}: {box}" for text, box, _ in self.content])
-    

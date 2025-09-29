@@ -1,5 +1,6 @@
 from datetime import timezone
 
+
 def to_utc_iso(dt):
     if dt is None:
         return None

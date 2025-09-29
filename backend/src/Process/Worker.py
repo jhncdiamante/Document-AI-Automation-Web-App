@@ -18,6 +18,7 @@ from src.Helpers.date_formats import to_utc_iso
 from src.flask_config import app
 from src.Socket import socketio
 
+
 class Worker:
     def __init__(self, ai_model=None, poppler_path=None):
         self.app = app
@@ -57,7 +58,7 @@ class Worker:
             for page in pages:
                 image_np = np.array(page)
                 recognized_texts = self.ocr.get_recognized_texts(image_np)
-                
+
                 pages_read.append(Page(content=recognized_texts))
 
             doc_type = (self.classifier.classify(pages_read) or "").strip().lower()
@@ -77,7 +78,11 @@ class Worker:
             print("Processing job...")
             with self.app.app_context():
                 with self.get_db_session() as session:
-                    job = session.query(JobModel).options(joinedload(JobModel.uploads)).get(job_id)
+                    job = (
+                        session.query(JobModel)
+                        .options(joinedload(JobModel.uploads))
+                        .get(job_id)
+                    )
                     if not job or job.status == "canceled":
                         return
                     job.status = "processing"
@@ -108,18 +113,23 @@ class Worker:
                     job_db = session.get(JobModel, job_id)
                     if job_db.status != "canceled":
                         job_db.status = "completed"
-                        audit = AuditResult(job_id=job_db.id, accuracy=results.get("accuracy"),
-                                            issues=results.get("issues"))
+                        audit = AuditResult(
+                            job_id=job_db.id,
+                            accuracy=results.get("accuracy"),
+                            issues=results.get("issues"),
+                        )
                         session.add(audit)
                         session.commit()
-                        self._emit_job_update({
-                            "id": job_db.id,
-                            "status": "completed",
-                            "accuracy": audit.accuracy,
-                            "issues": audit.issues,
-                            "completed_at": to_utc_iso(audit.completed_at),
-                            "user_id": job_db.user_id
-                        })
+                        self._emit_job_update(
+                            {
+                                "id": job_db.id,
+                                "status": "completed",
+                                "accuracy": audit.accuracy,
+                                "issues": audit.issues,
+                                "completed_at": to_utc_iso(audit.completed_at),
+                                "user_id": job_db.user_id,
+                            }
+                        )
 
         except Exception as e:
             traceback.print_exc()
@@ -132,23 +142,25 @@ class Worker:
                         audit = AuditResult(job_id=job_db.id, error=str(e))
                         session.add(audit)
                         session.commit()
-                        self._emit_job_failed({
-                            "id": job_db.id,
-                            "status": "failed",
-                            "error": job_db.error,
-                            "completed_at": to_utc_iso(audit.completed_at),
-                            "user_id": job_db.user_id
-                        })
+                        self._emit_job_failed(
+                            {
+                                "id": job_db.id,
+                                "status": "failed",
+                                "error": job_db.error,
+                                "completed_at": to_utc_iso(audit.completed_at),
+                                "user_id": job_db.user_id,
+                            }
+                        )
 
     def _emit_job_progress(self, job_id, user_id):
-        self.socketio.emit("job_progress", {"id": job_id, "status": "processing", "user_id": user_id},
-                           room=f"user_{user_id}")
+        self.socketio.emit(
+            "job_progress",
+            {"id": job_id, "status": "processing", "user_id": user_id},
+            room=f"user_{user_id}",
+        )
 
     def _emit_job_update(self, data):
         self.socketio.emit("job_update", data, room=f"user_{data.get('user_id')}")
 
     def _emit_job_failed(self, data):
         self.socketio.emit("job_failed", data, room=f"user_{data.get('user_id')}")
-
-
-
