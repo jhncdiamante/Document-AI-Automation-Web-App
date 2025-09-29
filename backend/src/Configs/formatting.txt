@@ -19,7 +19,6 @@
 * Some text may be noisy, misspelled, or jumbled.
 
 
-* Checkboxes are often misread or not detected.
 
 # Goal
 
@@ -39,6 +38,8 @@
 * When the key is located, identify its most likely corresponding value using your deductive thinking and in accordance of their given recognition boxes, even if it is not adjacent.
 
 * Normalize the value (remove trailing characters, fix obvious OCR errors, correct casing).
+
+* Evaluate if the value is legitimate as the value of the key. If it is too good to be true, skip it and set value to 'null'.
 
 * If the value is missing, attempt contextual deduction (e.g., if Sex is missing but the name indicates a likely gender, infer it).
 

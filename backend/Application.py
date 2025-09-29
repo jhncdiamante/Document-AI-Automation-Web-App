@@ -1,44 +1,22 @@
 import os
 import logging
-from datetime import timedelta
-
-from flask import request, jsonify, send_from_directory, session
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from flask_socketio import join_room
 from flask_session import Session
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
-from src.flask_config import app
+from src.flask_config import Config
 from src.Socket import socketio
 
-import queue
 from src.Models import db, User
 
+app = Flask(__name__)
+app.config.from_object(Config)
 
 CORS(app, supports_credentials=True)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/
-db_path = os.path.join(BASE_DIR, "users.db")
-
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'userdata', 'uploads')
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-    'connect_args': {'check_same_thread': False, 'timeout': 5}
-}
-
-# Session config
-app.config['SESSION_TYPE'] = 'sqlalchemy'
-app.config['SESSION_SQLALCHEMY'] = db
-app.config['SESSION_COOKIE_SECURE'] = False
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
 
 # Extensions
 bcrypt = Bcrypt(app)
@@ -49,8 +27,6 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-
-print("Initializing jobs..")
 
 from src.Process.JobManager import Jobs
 

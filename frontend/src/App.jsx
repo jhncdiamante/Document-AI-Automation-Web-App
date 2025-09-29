@@ -68,12 +68,15 @@ const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const FuneralAuditDashboard = () => {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState("");
+
   const [showAddJob, setShowAddJob] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("");
+
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -375,6 +378,13 @@ const FuneralAuditDashboard = () => {
       </motion.div>
     );
   }
+  const filteredJobs = jobs
+  .filter((job) => !selectedBranch || job.branch === selectedBranch)
+  .filter((job) =>
+    job.case_number?.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+    job.branch?.toLowerCase().includes(searchQuery.toLowerCase().trim())
+  );
+
 
   return (
     <motion.div
@@ -409,10 +419,15 @@ const FuneralAuditDashboard = () => {
             <div className="relative">
               <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
-                type="text"
-                placeholder="Search documents..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              />
+              type="text"
+              placeholder="Search by case number or branch"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg 
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+                        focus:border-transparent transition-all duration-200 placeholder:text-xs "
+            />
+
             </div>
 
             <div className="flex items-center space-x-3">
@@ -501,7 +516,7 @@ const FuneralAuditDashboard = () => {
                 </motion.div>
                 <p className="text-lg font-medium">Loading jobs...</p>
               </motion.div>
-            ) : jobs.filter((job) => !selectedBranch || job.branch === selectedBranch).length === 0 ? (
+            ) : filteredJobs.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -519,8 +534,7 @@ const FuneralAuditDashboard = () => {
               </motion.div>
             ) : (
               <AnimatePresence>
-                {jobs
-                  .filter((job) => !selectedBranch || job.branch === selectedBranch)
+                {filteredJobs
                   .map((job, index) => (
                     <motion.div
                       key={job.id}
