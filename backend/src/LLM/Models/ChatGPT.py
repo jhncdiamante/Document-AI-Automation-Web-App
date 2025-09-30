@@ -39,7 +39,7 @@ class ChatGPTAI(IModel):
             if not text:
                 raise RuntimeError("ChatGPT returned an empty response.")
 
-            print("ChatGPT raw text:", repr(text[:300]))
+            print("ChatGPT raw text:", text)
             return text
         except Exception as e:
             raise RuntimeError(f"ChatGPT API call failed: {e}")
@@ -59,7 +59,6 @@ class ChatGPTAI(IModel):
                 response_format={"type": "json_object"} 
             )
 
-            # Directly decode the JSON string into a Python dict
             content = response.choices[0].message.content
             data = json.loads(content)
 
