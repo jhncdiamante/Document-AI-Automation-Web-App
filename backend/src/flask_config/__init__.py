@@ -1,5 +1,8 @@
 import os
 from dotenv import load_dotenv
+from flask import Flask
+from flask_session.sqlalchemy import SqlAlchemySessionInterface
+from src.Models import db
 
 load_dotenv()
 
@@ -15,3 +18,17 @@ class Config:
     SESSION_TYPE = "sqlalchemy"
     SESSION_COOKIE_HTTPONLY = True
     SESSION_REFRESH_EACH_REQUEST = False
+
+
+app = Flask(__name__)
+app.config.from_object(Config)
+
+# Initialize db
+db.init_app(app)
+
+app.session_interface = SqlAlchemySessionInterface(
+    app,
+    db,
+    "sessions",   # table name
+    "sess_",      # key prefix
+)

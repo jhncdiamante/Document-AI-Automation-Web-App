@@ -8,6 +8,8 @@ from src.Documents.Page import Page
 from src.OCR.PaddleTextRecognition import PaddleOCRTextRecognition
 from src.Features.Classification import DocumentClassification
 from src.LLM.Models.ChatGPT import ChatGPTAI
+from src.LLM.Models.Gemini import GeminiAI
+
 from src.Documents.DocumentFormatting.DeathCertificate import DeathCertificate
 from src.Documents.DocumentFormatting.DRW import DeathRegistrationWorksheet
 from src.Features.Formatter import DocumentFormatter

@@ -13,21 +13,17 @@ from flask_login import (
 )
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
-from src.flask_config import Config
+from src.flask_config import app
 from src.Socket import socketio
 
 from src.Models import db, User
 
-app = Flask(__name__)
-app.config.from_object(Config)
 
 CORS(app, supports_credentials=True)
 
 
 # Extensions
 bcrypt = Bcrypt(app)
-db.init_app(app)
-Session(app)
 migrate = Migrate(app, db)
 
 login_manager = LoginManager()

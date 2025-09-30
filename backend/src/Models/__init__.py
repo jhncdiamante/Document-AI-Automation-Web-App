@@ -16,6 +16,8 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
+
+
 class User(db.Model, UserMixin):
     __tablename__ = "users"
 
